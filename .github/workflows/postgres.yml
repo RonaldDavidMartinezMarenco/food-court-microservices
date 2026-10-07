@@ -1,0 +1,16 @@
+name: postgres
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  databases:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: docker compose --env-file .env.example -f compose.postgres.yml up -d --wait
+      - run: |
+          docker compose --env-file .env.example -f compose.postgres.yml exec -T postgres \
+            psql -U foodcourt -d user_db -c '\l' | grep -E 'user_db|plaza_db|traceability_db'
+      - run: docker compose --env-file .env.example -f compose.postgres.yml down -v

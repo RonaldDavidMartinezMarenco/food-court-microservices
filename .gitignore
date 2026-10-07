@@ -1,0 +1,7 @@
+.env
+/.cursor/
+# Each service is its own Git repository. The master does not version it.
+/user-service/
+/plaza-service/
+/traceability-service/
+/messaging-service/
