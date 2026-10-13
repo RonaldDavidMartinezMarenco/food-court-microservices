@@ -16,6 +16,7 @@ This repository is the master checkout. It holds the docs, Compose files, and th
 - [Order flow](#order-flow)
 - [Quick start](#quick-start)
 - [Run the services](#run-the-services)
+- [Seed data](#seed-data)
 - [Layout](#layout)
 
 ## Repositories
@@ -74,6 +75,10 @@ Inside Compose the database host is `postgres` and the port is `5432`. `docker c
 
 Fill `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` in `.env` before sending the ready-order SMS. `.env` is not committed.
 
+## Seed data
+
+With the services running on an empty database, `bash scripts/seed.sh` loads owners, restaurants, dishes, and employees through the API. The accounts, ids, and manual test cases are in [docs/testing/seed-data.md](docs/testing/seed-data.md).
+
 ## Layout
 
 ```text
@@ -86,6 +91,7 @@ food-court-microservices/          this repository
   compose.postgres.yml             Postgres only
   postgres/init-databases.sql
   scripts/clone-services.sh
+  scripts/seed.sh                  demo data through the API
   docs/
 ```
 
