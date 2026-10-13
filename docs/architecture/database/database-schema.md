@@ -2,7 +2,7 @@
 
 Target model for the three PostgreSQL databases. `messaging-service` has no database.
 
-Each service applies this SQL with Flyway on startup. `V1` creates the tables. Later scripts add the case-insensitive restaurant name index and the length checks: `user-service/src/main/resources/db/migration/V2__owner_name_shape.sql`, `plaza-service/src/main/resources/db/migration/V2__restaurant_name_unique.sql`, and `plaza-service/src/main/resources/db/migration/V3__text_length.sql`.
+Each service applies this SQL with Flyway on startup. `V1` creates the tables. Later scripts add the case-insensitive restaurant name index, the length checks, and the employee restaurant check: `user-service/src/main/resources/db/migration/V2__owner_name_shape.sql`, `user-service/src/main/resources/db/migration/V3__employee_restaurant.sql`, `plaza-service/src/main/resources/db/migration/V2__restaurant_name_unique.sql`, and `plaza-service/src/main/resources/db/migration/V3__text_length.sql`.
 
 There is one PostgreSQL server and three databases. Tables live in `public`. A restaurant id stored in `user_db`, or a user id stored in `plaza_db`, is a logical reference. PostgreSQL cannot enforce a foreign key across databases.
 
@@ -46,6 +46,10 @@ CREATE TABLE app_user (
         char_length(last_name) BETWEEN 2 AND 80
         AND last_name = btrim(last_name)
         AND position('  ' IN last_name) = 0
+    ),
+    CONSTRAINT employee_restaurant CHECK (
+        (role_id = 3 AND restaurant_id IS NOT NULL)
+        OR (role_id <> 3 AND restaurant_id IS NULL)
     )
 );
 
@@ -55,6 +59,8 @@ CREATE TABLE app_user (
 -- of the owner who created the account. The other roles leave it null.
 ```
 
+`employee_restaurant` enforces that last comment. `V3__employee_restaurant.sql` adds it after `V2`. The application also checks, before insert, that the restaurant exists in `plaza_db` and that its `owner_id` is the calling owner. PostgreSQL cannot check that across databases.
+
 `password_hash` is the bcrypt hash of the password. The password itself is not stored.
 
 The first administrator is inserted by `user-service` before login is required. The row uses the same columns. Its hash is generated with bcrypt at that moment.
@@ -63,8 +69,8 @@ The first administrator is inserted by `user-service` before login is required. 
 | --- | --- |
 | `first_name`, `last_name`, `identity_document`, `phone`, `email`, `password_hash` | HU 1, HU 6, HU 8 |
 | `birth_date` | HU 1. Owners only. |
-| `role_id` | HU 1 forces `OWNER`. HU 6 forces `EMPLOYEE`. HU 8 forces `CUSTOMER`. HU 6 and HU 8 receive `idRol`. |
-| `restaurant_id` | HU 6. The employee belongs to the calling owner's restaurant. |
+| `role_id` | HU 1 forces `OWNER`. HU 6 forces `EMPLOYEE`. HU 8 forces `CUSTOMER`. HU 6 and HU 8 receive `idRol`; HU 6 rejects any value other than `3`. |
+| `restaurant_id` | HU 6. Required for an employee and null for every other role (`employee_restaurant`). It is a restaurant owned by the calling owner. |
 
 ## plaza_db
 
