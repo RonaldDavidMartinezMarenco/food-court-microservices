@@ -2,7 +2,7 @@
 
 `scripts/seed.sh` loads a known set of accounts, restaurants, and dishes through the public API. Each row goes through the same validation, bcrypt hashing, and ownership checks as a manual call, so the seed only contains data the services accept.
 
-The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), and HU 6 (employees). Customers and orders do not exist yet; extend the script when HU 8 and HU 11 add their endpoints.
+The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), and HU 6 (employees). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. Customers and orders do not exist yet; extend the script when HU 8 and HU 11 add their endpoints.
 
 ## Contents
 
@@ -188,6 +188,23 @@ The body accepts only `price` and `description`.
 | Own dish | Carlos, `/dishes/2` | 200 |
 | Dish of another owner | Laura, `/dishes/1` | 403 |
 | Extra field | Carlos, body with `"name"` | 400 |
+| Id that is not positive | `/dishes/0` | 400 |
+| Unknown dish | `/dishes/999` | 404 |
+
+### Enable or disable a dish (HU 7), `PUT /dishes/{id}/active`
+
+The body is `{"active": true}` or `{"active": false}`. Sending the same state again returns 200.
+
+| Case | Caller and body | Expected |
+| --- | --- | --- |
+| Disable own dish | Carlos, `/dishes/2`, `"active": false` | 200 with `active: false` |
+| Enable own dish | Carlos, `/dishes/2`, `"active": true` | 200 with `active: true` |
+| Same state again | Carlos, `/dishes/2`, `"active": false` twice | 200 both times |
+| Dish of another owner | Laura, `/dishes/1` | 403 |
+| Employee or administrator | Pedro or the administrator | 403 |
+| Extra field | Carlos, body with `"price"` | 400 |
+| Active as text or a number | `"active": "false"`, `0`, or `1` | 400 |
+| Missing active | `{}` | 400 |
 | Id that is not positive | `/dishes/0` | 400 |
 | Unknown dish | `/dishes/999` | 404 |
 
