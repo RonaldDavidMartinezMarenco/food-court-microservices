@@ -69,7 +69,7 @@ The first administrator is inserted by `user-service` before login is required. 
 | --- | --- |
 | `first_name`, `last_name`, `identity_document`, `phone`, `email`, `password_hash` | HU 1, HU 6, HU 8 |
 | `birth_date` | HU 1. Owners only. |
-| `role_id` | HU 1 forces `OWNER`. HU 6 forces `EMPLOYEE`. HU 8 forces `CUSTOMER`. HU 6 and HU 8 receive `idRol`; HU 6 rejects any value other than `3`. |
+| `role_id` | HU 1 forces `OWNER`. HU 6 forces `EMPLOYEE`. HU 8 forces `CUSTOMER`. HU 6 and HU 8 receive `idRol`; HU 6 rejects any value other than `3`. HU 8 rejects any value other than `4`. |
 | `restaurant_id` | HU 6. Required for an employee and null for every other role (`employee_restaurant`). It is a restaurant owned by the calling owner. |
 
 ## plaza_db
