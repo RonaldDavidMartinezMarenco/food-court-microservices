@@ -220,11 +220,57 @@ echo "Customers (HU 8)"
 camila_id="$(create_customer Camila Restrepo 3010101010 +573003330001 camila.restrepo@example.com)"
 mateo_id="$(create_customer Mateo Vargas 3020202020 +573003330002 mateo.vargas@example.com)"
 
+echo "Restaurants for pagination (HU 9)"
+mariana_id="$(create_owner Mariana Ortiz 1050505050 +573001110005 1988-03-08 mariana.ortiz@example.com)"
+pagination_restaurants=(
+  "Zumos Tropicales|zumos-tropicales"
+  "Café Andino|cafe-andino"
+  "Ñapa Antioqueña|napa-antioquena"
+  "Burger & Co.|burger-co"
+  "7 Mares Cevichería|7-mares"
+  "Oishi Ramen|oishi-ramen"
+  "empanadas la 33|empanadas-la-33"
+  "Kebab Estambul|kebab-estambul"
+  "Ánfora Mediterránea|anfora-mediterranea"
+  "Wok Express|wok-express"
+  "Green Bowl|green-bowl"
+  "Nono Pasta Fresca|nono-pasta-fresca"
+  "El Fogón Paisa|el-fogon-paisa"
+  "Dragón Dorado|dragon-dorado"
+  "Mama's Kitchen|mamas-kitchen"
+  "Pollo Dorado 24-7|pollo-dorado"
+  "Falafel King|falafel-king"
+  "La Taquería Mexicana|la-taqueria-mexicana"
+  "Hamburguesas El Corral|hamburguesas-el-corral"
+  "Arepas Doña Rosa|arepas-dona-rosa"
+)
+n=1
+for entry in "${pagination_restaurants[@]}"; do
+  name="${entry%%|*}"
+  slug="${entry#*|}"
+  nn="$(printf '%02d' "$n")"
+  create_restaurant "$name" "9002000${nn}" "Calle 50 # 10-${nn}, Local 3${nn}" "+5760155502${nn}" \
+    "https://images.example.com/logos/${slug}.png" "$mariana_id" > /dev/null
+  n=$((n + 1))
+done
+
 for email in pedro.martinez@example.com sofia.herrera@example.com kenji.morales@example.com \
     valentina.rossi@example.com andres.torres@example.com \
-    camila.restrepo@example.com mateo.vargas@example.com; do
+    camila.restrepo@example.com mateo.vargas@example.com mariana.ortiz@example.com; do
   login "$email" "$seed_password" > /dev/null
 done
+
+echo "Restaurant list (HU 9)"
+camila_token="$(login camila.restrepo@example.com "$seed_password")"
+restaurant_page="$(call GET "$plaza_url/restaurants?page=0&size=10" "$camila_token" "" 200)"
+total_items="$(jq -r .totalItems <<< "$restaurant_page")"
+first_name="$(jq -r '.items[0].name' <<< "$restaurant_page")"
+if [[ $total_items != 23 || $first_name != "7 Mares Cevichería" ]]; then
+  echo "GET /restaurants returned totalItems=$total_items and first name '$first_name'." >&2
+  exit 1
+fi
+echo "totalItems=$total_items"
+jq -r '.items[].name' <<< "$restaurant_page"
 
 echo
 echo "Seed loaded. Every seeded account uses the password: $seed_password"
@@ -239,9 +285,11 @@ printf '%-28s %-14s %4s  %s\n' \
   kenji.morales@example.com EMPLOYEE "$kenji_id" "$sushi_id" \
   valentina.rossi@example.com EMPLOYEE "$valentina_id" "$napoli_id" \
   camila.restrepo@example.com CUSTOMER "$camila_id" - \
-  mateo.vargas@example.com CUSTOMER "$mateo_id" -
+  mateo.vargas@example.com CUSTOMER "$mateo_id" - \
+  mariana.ortiz@example.com OWNER "$mariana_id" "20 restaurants for pagination"
 echo
 echo "Restaurants: $parrilla_id La Parrilla de Carlos, $sushi_id Sushi Zen 88, $napoli_id Pizzería Bella Napoli"
+echo "Pagination catalog: 20 restaurants of Mariana ($mariana_id), created after those three"
 echo "Dishes of La Parrilla de Carlos: $churrasco_id $costillas_id $ensalada_id $limonada_id"
 echo "Dishes of Sushi Zen 88: $california_id $nigiri_id $te_id"
 echo "Dishes of Pizzería Bella Napoli: $margarita_id $pepperoni_id $lasana_id $tiramisu_id"

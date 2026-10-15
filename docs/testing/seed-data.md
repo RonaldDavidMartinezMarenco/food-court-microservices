@@ -2,7 +2,7 @@
 
 `scripts/seed.sh` loads a known set of accounts, restaurants, and dishes through the public API. Each row goes through the same validation, bcrypt hashing, and ownership checks as a manual call, so the seed only contains data the services accept.
 
-The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), and HU 8 (customers). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. Orders do not exist yet; extend the script when HU 11 adds its endpoint.
+The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), and HU 9 (the restaurant list). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. Orders do not exist yet; extend the script when HU 11 adds its endpoint.
 
 ## Contents
 
@@ -61,28 +61,50 @@ Every seeded account uses the password `Password123`. The administrator uses the
 | 8 | `EMPLOYEE` | Valentina Rossi | `valentina.rossi@example.com` | `2040404040` | `+573002220004` | 3 |
 | 9 | `CUSTOMER` | Camila Restrepo | `camila.restrepo@example.com` | `3010101010` | `+573003330001` | |
 | 10 | `CUSTOMER` | Mateo Vargas | `mateo.vargas@example.com` | `3020202020` | `+573003330002` | |
+| 11 | `OWNER` | Mariana Ortiz | `mariana.ortiz@example.com` | `1050505050` | `+573001110005` | 4 to 23 |
 
-Owner birth dates: Carlos `1985-04-12`, Laura `1990-09-30`, Andrés `1978-01-20`. Employees and customers have no birth date. A customer belongs to no restaurant.
+Owner birth dates: Carlos `1985-04-12`, Laura `1990-09-30`, Andrés `1978-01-20`, Mariana `1988-03-08`. Employees and customers have no birth date. A customer belongs to no restaurant.
 
 Each account has a purpose in the tests:
 
 - Carlos owns two restaurants, so one owner can manage more than one menu and employee list.
 - Laura owns one restaurant. She is the "other owner" for the 403 cases.
 - Andrés is an owner without a restaurant. He can receive a new restaurant (HU 2) and is rejected when he creates employees or dishes.
-- Each restaurant has at least one employee for the order stories.
-- Camila and Mateo are customers. HU 11 can give one of them an order in progress and leave the other free to order.
+- La Parrilla de Carlos, Sushi Zen 88, and Pizzería Bella Napoli each have at least one employee for the order stories.
+- Camila and Mateo are customers. HU 11 can give one of them an order in progress and leave the other free to order. Camila is also the caller for the restaurant list.
+- Mariana owns the twenty restaurants added for pagination. She has no dishes and no employees.
 
 ## Restaurants
 
 Created by the administrator.
 
-| Id | Name | NIT | Address | Phone | Owner |
-| --- | --- | --- | --- | --- | --- |
-| 1 | La Parrilla de Carlos | `900100001` | Calle 10 # 5-20, Local 101 | `+576015550101` | 2 Carlos |
-| 2 | Sushi Zen 88 | `900100002` | Carrera 7 # 45-12, Local 102 | `+576015550102` | 2 Carlos |
-| 3 | Pizzería Bella Napoli | `900100003` | Avenida 68 # 22-30, Local 201 | `+576015550103` | 3 Laura |
+| Id | Name | NIT | Address | Phone | Owner | Alphabetical |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | La Parrilla de Carlos | `900100001` | Calle 10 # 5-20, Local 101 | `+576015550101` | 2 Carlos | 13 |
+| 2 | Sushi Zen 88 | `900100002` | Carrera 7 # 45-12, Local 102 | `+576015550102` | 2 Carlos | 21 |
+| 3 | Pizzería Bella Napoli | `900100003` | Avenida 68 # 22-30, Local 201 | `+576015550103` | 3 Laura | 19 |
+| 4 | Zumos Tropicales | `900200001` | Calle 50 # 10-01, Local 301 | `+576015550201` | 11 Mariana | 23 |
+| 5 | Café Andino | `900200002` | Calle 50 # 10-02, Local 302 | `+576015550202` | 11 Mariana | 5 |
+| 6 | Ñapa Antioqueña | `900200003` | Calle 50 # 10-03, Local 303 | `+576015550203` | 11 Mariana | 17 |
+| 7 | Burger & Co. | `900200004` | Calle 50 # 10-04, Local 304 | `+576015550204` | 11 Mariana | 4 |
+| 8 | 7 Mares Cevichería | `900200005` | Calle 50 # 10-05, Local 305 | `+576015550205` | 11 Mariana | 1 |
+| 9 | Oishi Ramen | `900200006` | Calle 50 # 10-06, Local 306 | `+576015550206` | 11 Mariana | 18 |
+| 10 | empanadas la 33 | `900200007` | Calle 50 # 10-07, Local 307 | `+576015550207` | 11 Mariana | 8 |
+| 11 | Kebab Estambul | `900200008` | Calle 50 # 10-08, Local 308 | `+576015550208` | 11 Mariana | 12 |
+| 12 | Ánfora Mediterránea | `900200009` | Calle 50 # 10-09, Local 309 | `+576015550209` | 11 Mariana | 2 |
+| 13 | Wok Express | `900200010` | Calle 50 # 10-10, Local 310 | `+576015550210` | 11 Mariana | 22 |
+| 14 | Green Bowl | `900200011` | Calle 50 # 10-11, Local 311 | `+576015550211` | 11 Mariana | 10 |
+| 15 | Nono Pasta Fresca | `900200012` | Calle 50 # 10-12, Local 312 | `+576015550212` | 11 Mariana | 16 |
+| 16 | El Fogón Paisa | `900200013` | Calle 50 # 10-13, Local 313 | `+576015550213` | 11 Mariana | 7 |
+| 17 | Dragón Dorado | `900200014` | Calle 50 # 10-14, Local 314 | `+576015550214` | 11 Mariana | 6 |
+| 18 | Mama's Kitchen | `900200015` | Calle 50 # 10-15, Local 315 | `+576015550215` | 11 Mariana | 15 |
+| 19 | Pollo Dorado 24-7 | `900200016` | Calle 50 # 10-16, Local 316 | `+576015550216` | 11 Mariana | 20 |
+| 20 | Falafel King | `900200017` | Calle 50 # 10-17, Local 317 | `+576015550217` | 11 Mariana | 9 |
+| 21 | La Taquería Mexicana | `900200018` | Calle 50 # 10-18, Local 318 | `+576015550218` | 11 Mariana | 14 |
+| 22 | Hamburguesas El Corral | `900200019` | Calle 50 # 10-19, Local 319 | `+576015550219` | 11 Mariana | 11 |
+| 23 | Arepas Doña Rosa | `900200020` | Calle 50 # 10-20, Local 320 | `+576015550220` | 11 Mariana | 3 |
 
-Logos follow `https://images.example.com/logos/<slug>.png`. "Sushi Zen 88" has digits and a letter, which HU 2 allows.
+Logos follow `https://images.example.com/logos/<slug>.png`. "Sushi Zen 88" has digits and a letter, which HU 2 allows. Restaurants 4 to 23 are created in an order that is not alphabetical, so a response ordered by id is visibly different from `GET /restaurants`. The names cover an initial accent, `Ñ`, a lowercase initial, a leading digit, `&`, `'`, `-`, and `.`. The alphabetical column is the Spanish order (`Ñ` after `N`, case ignored).
 
 ## Dishes
 
@@ -271,3 +293,23 @@ Example body:
   "roleId": 4
 }
 ```
+
+### List restaurants (HU 9), `GET /restaurants`
+
+A customer calls it. `page` starts at 0 and defaults to 0. `size` defaults to 10 and cannot exceed 50. The order is the name, using Spanish collation, then the id. A `sort` parameter is ignored. Each item has `id`, `name`, and `logoUrl`.
+
+| Case | Caller and query | Expected |
+| --- | --- | --- |
+| First page | Camila, no query | 200, 10 items, `totalItems` 23, `totalPages` 3, first name `7 Mares Cevichería` |
+| Second page | Camila, `page=1&size=10` | 200, `Nono Pasta Fresca` before `Ñapa Antioqueña` |
+| Last page | Camila, `page=2&size=10` | 200, three items: `Sushi Zen 88`, `Wok Express`, `Zumos Tropicales` |
+| Page past the end | Camila, `page=3&size=10` | 200 with `items: []` and the same totals |
+| Whole catalog | Camila, `size=50` | 200 with 23 items |
+| Size above 50 | Camila, `size=51` | 400 |
+| Size zero | Camila, `size=0` | 400 |
+| Negative page | Camila, `page=-1` | 400 |
+| Page that is not an integer | Camila, `page=abc` | 400 |
+| Offset past the integer range | Camila, `page=2147483647` | 400 |
+| Sort parameter | Camila, `sort=nit,desc` | 200, same order as the first page |
+| Owner, administrator, or employee | Carlos, the administrator, or Pedro | 403 |
+| No token | no `Authorization` header | 401 |
