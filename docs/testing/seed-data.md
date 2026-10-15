@@ -2,7 +2,7 @@
 
 `scripts/seed.sh` loads a known set of accounts, restaurants, and dishes through the public API. Each row goes through the same validation, bcrypt hashing, and ownership checks as a manual call, so the seed only contains data the services accept.
 
-The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), and HU 6 (employees). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. Customers and orders do not exist yet; extend the script when HU 8 and HU 11 add their endpoints.
+The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), and HU 8 (customers). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. Orders do not exist yet; extend the script when HU 11 adds its endpoint.
 
 ## Contents
 
@@ -59,8 +59,10 @@ Every seeded account uses the password `Password123`. The administrator uses the
 | 6 | `EMPLOYEE` | Sofía Herrera | `sofia.herrera@example.com` | `2020202020` | `+573002220002` | 1 |
 | 7 | `EMPLOYEE` | Kenji Morales | `kenji.morales@example.com` | `2030303030` | `+573002220003` | 2 |
 | 8 | `EMPLOYEE` | Valentina Rossi | `valentina.rossi@example.com` | `2040404040` | `+573002220004` | 3 |
+| 9 | `CUSTOMER` | Camila Restrepo | `camila.restrepo@example.com` | `3010101010` | `+573003330001` | |
+| 10 | `CUSTOMER` | Mateo Vargas | `mateo.vargas@example.com` | `3020202020` | `+573003330002` | |
 
-Owner birth dates: Carlos `1985-04-12`, Laura `1990-09-30`, Andrés `1978-01-20`. Employees have no birth date.
+Owner birth dates: Carlos `1985-04-12`, Laura `1990-09-30`, Andrés `1978-01-20`. Employees and customers have no birth date. A customer belongs to no restaurant.
 
 Each account has a purpose in the tests:
 
@@ -68,6 +70,7 @@ Each account has a purpose in the tests:
 - Laura owns one restaurant. She is the "other owner" for the 403 cases.
 - Andrés is an owner without a restaurant. He can receive a new restaurant (HU 2) and is rejected when he creates employees or dishes.
 - Each restaurant has at least one employee for the order stories.
+- Camila and Mateo are customers. HU 11 can give one of them an order in progress and leave the other free to order.
 
 ## Restaurants
 
@@ -236,5 +239,35 @@ Example body:
   "password": "Password123",
   "roleId": 3,
   "restaurantId": 2
+}
+```
+
+### Create customer (HU 8), `POST /customers`
+
+The call needs no access token. `roleId` must be `4` (`CUSTOMER`). The body accepts no restaurant and no birth date.
+
+| Case | Body | Expected |
+| --- | --- | --- |
+| New customer | New email and document, `roleId` 4, no token | 201 with `role: CUSTOMER` and `Location: /users/{id}` |
+| Same customer again | The email just registered | 409 |
+| Document in use | `3010101010` | 409 |
+| Role other than customer | `roleId` 1 | 400 "The role must be CUSTOMER" |
+| Extra field | `"restaurantId": 5` | 400 |
+| Role id as text or a decimal | `"roleId": "4"` or `4.5` | 400 |
+| Phone shorter than 7 | `"+12345"` | 400 |
+| Password of 40 `ñ` | 80 bytes, past the 72 bcrypt stores | 400 "The password must not exceed 72 bytes" |
+| Then log in | `POST /login` with the new customer | 200 with `role: CUSTOMER` |
+
+Example body:
+
+```json
+{
+  "firstName": "Camila",
+  "lastName": "Restrepo",
+  "identityDocument": "3010101010",
+  "phone": "+573003330001",
+  "email": "camila.restrepo@example.com",
+  "password": "Password123",
+  "roleId": 4
 }
 ```

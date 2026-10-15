@@ -16,6 +16,7 @@ user_url="${USER_URL:-http://localhost:8081}"
 plaza_url="${PLAZA_URL:-http://localhost:8082}"
 seed_password="${SEED_PASSWORD:-Password123}"
 employee_role_id=3
+customer_role_id=4
 
 env_value() {
   local file="$root/.env"
@@ -127,6 +128,17 @@ create_employee() {
   call POST "$user_url/employees" "$token" "$body" 201 | jq -r .id
 }
 
+create_customer() {
+  local body
+  body="$(jq -n \
+    --arg firstName "$1" --arg lastName "$2" --arg identityDocument "$3" \
+    --arg phone "$4" --arg email "$5" --arg password "$seed_password" \
+    --argjson roleId "$customer_role_id" \
+    '{firstName: $firstName, lastName: $lastName, identityDocument: $identityDocument,
+      phone: $phone, email: $email, password: $password, roleId: $roleId}')"
+  call POST "$user_url/customers" "" "$body" 201 | jq -r .id
+}
+
 wait_for user-service "$user_url"
 wait_for plaza-service "$plaza_url"
 
@@ -204,8 +216,13 @@ kenji_id="$(create_employee "$carlos_token" Kenji Morales 2030303030 +5730022200
 valentina_id="$(create_employee "$laura_token" Valentina Rossi 2040404040 +573002220004 \
   valentina.rossi@example.com "$napoli_id")"
 
+echo "Customers (HU 8)"
+camila_id="$(create_customer Camila Restrepo 3010101010 +573003330001 camila.restrepo@example.com)"
+mateo_id="$(create_customer Mateo Vargas 3020202020 +573003330002 mateo.vargas@example.com)"
+
 for email in pedro.martinez@example.com sofia.herrera@example.com kenji.morales@example.com \
-    valentina.rossi@example.com andres.torres@example.com; do
+    valentina.rossi@example.com andres.torres@example.com \
+    camila.restrepo@example.com mateo.vargas@example.com; do
   login "$email" "$seed_password" > /dev/null
 done
 
@@ -220,7 +237,9 @@ printf '%-28s %-14s %4s  %s\n' \
   pedro.martinez@example.com EMPLOYEE "$pedro_id" "$parrilla_id" \
   sofia.herrera@example.com EMPLOYEE "$sofia_id" "$parrilla_id" \
   kenji.morales@example.com EMPLOYEE "$kenji_id" "$sushi_id" \
-  valentina.rossi@example.com EMPLOYEE "$valentina_id" "$napoli_id"
+  valentina.rossi@example.com EMPLOYEE "$valentina_id" "$napoli_id" \
+  camila.restrepo@example.com CUSTOMER "$camila_id" - \
+  mateo.vargas@example.com CUSTOMER "$mateo_id" -
 echo
 echo "Restaurants: $parrilla_id La Parrilla de Carlos, $sushi_id Sushi Zen 88, $napoli_id Pizzería Bella Napoli"
 echo "Dishes of La Parrilla de Carlos: $churrasco_id $costillas_id $ensalada_id $limonada_id"
