@@ -182,7 +182,7 @@ An order has no price column. Payment is out of scope.
 
 The partial unique index is the rule that a customer has at most one order in `PENDING`, `IN_PREPARATION`, or `READY`.
 
-HU 9 lists restaurants by `name` and returns `id`, `name`, and `logo_url`. HU 10 lists dishes of a restaurant and can filter by `category`. HU 12 lists orders of the employee's restaurant by `status`.
+HU 9 lists restaurants by `name` and returns `id`, `name`, and `logo_url`. HU 10 lists the active dishes of one restaurant, ordered by `name` and then `id`, and can filter by the stored `category` text. `category` stays `TEXT`. A disabled dish is left out of that page and out of its totals. HU 12 lists orders of the employee's restaurant by `status`.
 
 `restaurant.name` uses the `es-x-icu` collation, added by `V4__restaurant_name_collation.sql`, so the list orders `Ñ` after `N`. The collation is deterministic, so `restaurant_name_ci_idx` and the case-insensitive name check stay valid. PostgreSQL rebuilds `restaurant_name_idx` when the column collation changes.
 
