@@ -2,7 +2,7 @@
 
 `scripts/seed.sh` loads a known set of accounts, restaurants, and dishes through the public API. Each row goes through the same validation, bcrypt hashing, and ownership checks as a manual call, so the seed only contains data the services accept.
 
-The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), and HU 9 (the restaurant list). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. Orders do not exist yet; extend the script when HU 11 adds its endpoint.
+The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), HU 9 (the restaurant list), and HU 10 (the menu of a restaurant). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. Orders do not exist yet; extend the script when HU 11 adds its endpoint.
 
 ## Contents
 
@@ -71,8 +71,8 @@ Each account has a purpose in the tests:
 - Laura owns one restaurant. She is the "other owner" for the 403 cases.
 - Andrés is an owner without a restaurant. He can receive a new restaurant (HU 2) and is rejected when he creates employees or dishes.
 - La Parrilla de Carlos, Sushi Zen 88, and Pizzería Bella Napoli each have at least one employee for the order stories.
-- Camila and Mateo are customers. HU 11 can give one of them an order in progress and leave the other free to order. Camila is also the caller for the restaurant list.
-- Mariana owns the twenty restaurants added for pagination. She has no dishes and no employees.
+- Camila and Mateo are customers. HU 11 can give one of them an order in progress and leave the other free to order. Camila is also the caller for the restaurant list and for each restaurant menu.
+- Mariana owns the twenty restaurants added for pagination. Café Andino has the twelve dishes used to page a menu. She has no employees. The other nineteen restaurants of hers have no dishes.
 
 ## Restaurants
 
@@ -124,7 +124,26 @@ Created by the owner of each restaurant. All are active. Images follow `https://
 | 10 | 3 Pizzería Bella Napoli | Lasaña boloñesa | Pastas | 30000 |
 | 11 | 3 Pizzería Bella Napoli | Tiramisú | Postres | 14000 |
 
-Dish 1 goes through HU 4 during the seed: created at 42000, then updated to 45000 with the description "Corte de res de 400 g a la parrilla con papas criollas y chimichurri." Each restaurant has two or more categories, and "Bebidas" exists in two restaurants, for the category filter in HU 10.
+Dish 1 goes through HU 4 during the seed: created at 42000, then updated to 45000 with the description "Corte de res de 400 g a la parrilla con papas criollas y chimichurri." Each of these three restaurants has two or more categories. "Bebidas" is also on Café Andino, so a category filter stays inside the restaurant of the path.
+
+Café Andino (id 5) has twelve more dishes, created by Mariana in an order that is not alphabetical. Names are ASCII so the page order does not depend on Spanish collation. The menu sorts by name, then by id.
+
+| Id | Name | Category | Price | Alphabetical |
+| --- | --- | --- | --- | --- |
+| 12 | Mocha | Cafes | 6000 | 10 |
+| 13 | Brownie | Pasteleria | 8000 | 2 |
+| 14 | Americano | Cafes | 5000 | 1 |
+| 15 | Cheesecake | Pasteleria | 11000 | 4 |
+| 16 | Espresso | Cafes | 4000 | 5 |
+| 17 | Galleta | Pasteleria | 3000 | 6 |
+| 18 | Latte | Cafes | 7000 | 8 |
+| 19 | Muffin | Pasteleria | 6500 | 11 |
+| 20 | Capuccino | Cafes | 7500 | 3 |
+| 21 | Waffle | Pasteleria | 9000 | 12 |
+| 22 | Jugo de naranja | Bebidas | 7000 | 7 |
+| 23 | Limonada de panela | Bebidas | 6500 | 9 |
+
+All twenty-three dishes are active. A default page of Café Andino returns the first ten names and leaves Muffin and Waffle on the second page.
 
 ## Get a token
 
@@ -311,5 +330,37 @@ A customer calls it. `page` starts at 0 and defaults to 0. `size` defaults to 10
 | Page that is not an integer | Camila, `page=abc` | 400 |
 | Offset past the integer range | Camila, `page=2147483647` | 400 |
 | Sort parameter | Camila, `sort=nit,desc` | 200, same order as the first page |
+| Owner, administrator, or employee | Carlos, the administrator, or Pedro | 403 |
+| No token | no `Authorization` header | 401 |
+
+### List dishes (HU 10), `GET /restaurants/{restaurantId}/dishes`
+
+A customer calls it. `page` starts at 0 and defaults to 0. `size` defaults to 10 and cannot exceed 50. `category` is optional. When it is present, surrounding spaces are removed and repeated spaces become one, then the value must match the stored category, including capitals. The order is the dish name, then the id. A `sort` parameter is ignored. Inactive dishes are omitted from `items` and from the totals. Each item has `id`, `restaurantId`, `name`, `price`, `description`, `imageUrl`, and `category`.
+
+| Case | Caller and query | Expected |
+| --- | --- | --- |
+| Whole small menu | Camila, `/restaurants/1/dishes` | 200, four items, `totalItems` 4, `totalPages` 1 |
+| Category of that restaurant | Camila, `/restaurants/1/dishes?category=Carnes` | 200, Churrasco then Costillas BBQ |
+| Same word, other restaurant | Camila, `/restaurants/1/dishes?category=Bebidas` | 200, only Limonada de coco |
+| Other case | Camila, `/restaurants/1/dishes?category=carnes` | 200 with `items: []`, `totalItems` 0, `totalPages` 0 |
+| Surrounding spaces | Camila, `/restaurants/1/dishes?category=%20%20Carnes%20%20` | 200, the two Carnes dishes |
+| First page of a long menu | Camila, `/restaurants/5/dishes` | 200, 10 items, `totalItems` 12, `totalPages` 2, first name `Americano` |
+| Second page | Camila, `/restaurants/5/dishes?page=1&size=10` | 200, Muffin then Waffle |
+| Category on that menu | Camila, `/restaurants/5/dishes?category=Bebidas` | 200, Jugo de naranja then Limonada de panela |
+| Restaurant without dishes | Camila, `/restaurants/4/dishes` | 200 with `items: []`, `totalItems` 0, `totalPages` 0 |
+| Page past the end | Camila, `/restaurants/1/dishes?page=1&size=10` | 200 with `items: []` and `totalItems` 4 |
+| Category that is not on the menu | Camila, `/restaurants/1/dishes?category=Pizzas` | 200 with `items: []` |
+| Size above 50 | Camila, `/restaurants/1/dishes?size=51` | 400 |
+| Size zero | Camila, `/restaurants/1/dishes?size=0` | 400 |
+| Negative page | Camila, `/restaurants/1/dishes?page=-1` | 400 |
+| Page that is not an integer | Camila, `/restaurants/1/dishes?page=abc` | 400 |
+| Offset past the integer range | Camila, `/restaurants/1/dishes?page=2147483647` | 400 |
+| Empty category | Camila, `/restaurants/1/dishes?category=` | 400 |
+| Digits only | Camila, `/restaurants/1/dishes?category=123` | 400 |
+| Category longer than 50 | Camila, `/restaurants/1/dishes?category=` followed by 51 `a` | 400 |
+| Sort parameter | Camila, `/restaurants/1/dishes?sort=price,desc` | 200, same order as the whole small menu |
+| Id that is not positive | Camila, `/restaurants/0/dishes` | 400 |
+| Unknown restaurant | Camila, `/restaurants/999/dishes` | 404 |
+| Disabled dish | Carlos disables `/dishes/2`, then Camila lists `/restaurants/1/dishes` | 200, three items, Costillas BBQ absent, `totalItems` 3 |
 | Owner, administrator, or employee | Carlos, the administrator, or Pedro | 403 |
 | No token | no `Authorization` header | 401 |

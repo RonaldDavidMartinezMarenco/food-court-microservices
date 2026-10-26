@@ -222,6 +222,8 @@ mateo_id="$(create_customer Mateo Vargas 3020202020 +573003330002 mateo.vargas@e
 
 echo "Restaurants for pagination (HU 9)"
 mariana_id="$(create_owner Mariana Ortiz 1050505050 +573001110005 1988-03-08 mariana.ortiz@example.com)"
+zumos_id=""
+cafe_id=""
 pagination_restaurants=(
   "Zumos Tropicales|zumos-tropicales"
   "Café Andino|cafe-andino"
@@ -249,10 +251,54 @@ for entry in "${pagination_restaurants[@]}"; do
   name="${entry%%|*}"
   slug="${entry#*|}"
   nn="$(printf '%02d' "$n")"
-  create_restaurant "$name" "9002000${nn}" "Calle 50 # 10-${nn}, Local 3${nn}" "+5760155502${nn}" \
-    "https://images.example.com/logos/${slug}.png" "$mariana_id" > /dev/null
+  restaurant_id="$(create_restaurant "$name" "9002000${nn}" "Calle 50 # 10-${nn}, Local 3${nn}" "+5760155502${nn}" \
+    "https://images.example.com/logos/${slug}.png" "$mariana_id")"
+  if [[ $slug == "zumos-tropicales" ]]; then
+    zumos_id=$restaurant_id
+  elif [[ $slug == "cafe-andino" ]]; then
+    cafe_id=$restaurant_id
+  fi
   n=$((n + 1))
 done
+
+echo "Dishes for pagination (HU 10)"
+mariana_token="$(login mariana.ortiz@example.com "$seed_password")"
+create_dish "$mariana_token" Mocha 6000 \
+  "Cafe espresso con chocolate." \
+  https://images.example.com/dishes/mocha.jpg Cafes "$cafe_id" > /dev/null
+create_dish "$mariana_token" Brownie 8000 \
+  "Brownie de chocolate con nueces." \
+  https://images.example.com/dishes/brownie.jpg Pasteleria "$cafe_id" > /dev/null
+create_dish "$mariana_token" Americano 5000 \
+  "Cafe filtrado largo." \
+  https://images.example.com/dishes/americano.jpg Cafes "$cafe_id" > /dev/null
+create_dish "$mariana_token" Cheesecake 11000 \
+  "Tarta de queso al horno." \
+  https://images.example.com/dishes/cheesecake.jpg Pasteleria "$cafe_id" > /dev/null
+create_dish "$mariana_token" Espresso 4000 \
+  "Cafe corto y concentrado." \
+  https://images.example.com/dishes/espresso.jpg Cafes "$cafe_id" > /dev/null
+create_dish "$mariana_token" Galleta 3000 \
+  "Galleta de avena y pasas." \
+  https://images.example.com/dishes/galleta.jpg Pasteleria "$cafe_id" > /dev/null
+create_dish "$mariana_token" Latte 7000 \
+  "Cafe con leche vaporizada." \
+  https://images.example.com/dishes/latte.jpg Cafes "$cafe_id" > /dev/null
+create_dish "$mariana_token" Muffin 6500 \
+  "Muffin de arandanos." \
+  https://images.example.com/dishes/muffin.jpg Pasteleria "$cafe_id" > /dev/null
+create_dish "$mariana_token" Capuccino 7500 \
+  "Cafe con espuma de leche." \
+  https://images.example.com/dishes/capuccino.jpg Cafes "$cafe_id" > /dev/null
+create_dish "$mariana_token" Waffle 9000 \
+  "Waffle con miel." \
+  https://images.example.com/dishes/waffle.jpg Pasteleria "$cafe_id" > /dev/null
+create_dish "$mariana_token" "Jugo de naranja" 7000 \
+  "Jugo de naranja natural." \
+  https://images.example.com/dishes/jugo-naranja.jpg Bebidas "$cafe_id" > /dev/null
+create_dish "$mariana_token" "Limonada de panela" 6500 \
+  "Limonada con panela." \
+  https://images.example.com/dishes/limonada-panela.jpg Bebidas "$cafe_id" > /dev/null
 
 for email in pedro.martinez@example.com sofia.herrera@example.com kenji.morales@example.com \
     valentina.rossi@example.com andres.torres@example.com \
@@ -272,6 +318,36 @@ fi
 echo "totalItems=$total_items"
 jq -r '.items[].name' <<< "$restaurant_page"
 
+echo "Dish list (HU 10)"
+carnes="$(call GET "$plaza_url/restaurants/$parrilla_id/dishes?category=Carnes" "$camila_token" "" 200)"
+parrilla_bebidas="$(call GET "$plaza_url/restaurants/$parrilla_id/dishes?category=Bebidas" "$camila_token" "" 200)"
+lower_carnes="$(call GET "$plaza_url/restaurants/$parrilla_id/dishes?category=carnes" "$camila_token" "" 200)"
+cafe_first="$(call GET "$plaza_url/restaurants/$cafe_id/dishes?page=0&size=10" "$camila_token" "" 200)"
+cafe_second="$(call GET "$plaza_url/restaurants/$cafe_id/dishes?page=1&size=10" "$camila_token" "" 200)"
+cafe_bebidas="$(call GET "$plaza_url/restaurants/$cafe_id/dishes?category=Bebidas" "$camila_token" "" 200)"
+zumos_menu="$(call GET "$plaza_url/restaurants/$zumos_id/dishes" "$camila_token" "" 200)"
+if [[ $(jq -r .totalItems <<< "$carnes") != 2 \
+    || $(jq -r .totalItems <<< "$parrilla_bebidas") != 1 \
+    || $(jq -r '.items[0].name' <<< "$parrilla_bebidas") != "Limonada de coco" \
+    || $(jq -r .totalItems <<< "$lower_carnes") != 0 \
+    || $(jq -r .totalPages <<< "$lower_carnes") != 0 \
+    || $(jq -r .totalItems <<< "$cafe_first") != 12 \
+    || $(jq -r .totalPages <<< "$cafe_first") != 2 \
+    || $(jq -r '.items | length' <<< "$cafe_first") != 10 \
+    || $(jq -r '.items[0].name' <<< "$cafe_first") != "Americano" \
+    || $(jq -r '.items | length' <<< "$cafe_second") != 2 \
+    || $(jq -r '.items[0].name' <<< "$cafe_second") != "Muffin" \
+    || $(jq -r '.items[1].name' <<< "$cafe_second") != "Waffle" \
+    || $(jq -r .totalItems <<< "$cafe_bebidas") != 2 \
+    || $(jq -r '.items[0].name' <<< "$cafe_bebidas") != "Jugo de naranja" \
+    || $(jq -r '.items[1].name' <<< "$cafe_bebidas") != "Limonada de panela" \
+    || $(jq -r .totalItems <<< "$zumos_menu") != 0 \
+    || $(jq -r .totalPages <<< "$zumos_menu") != 0 ]]; then
+  echo "GET /restaurants/{id}/dishes did not match the seeded menu." >&2
+  exit 1
+fi
+echo "Cafe Andino totalItems=12"
+
 echo
 echo "Seed loaded. Every seeded account uses the password: $seed_password"
 printf '%-28s %-14s %4s  %s\n' "Email" "Role" "Id" "Restaurant id"
@@ -286,10 +362,11 @@ printf '%-28s %-14s %4s  %s\n' \
   valentina.rossi@example.com EMPLOYEE "$valentina_id" "$napoli_id" \
   camila.restrepo@example.com CUSTOMER "$camila_id" - \
   mateo.vargas@example.com CUSTOMER "$mateo_id" - \
-  mariana.ortiz@example.com OWNER "$mariana_id" "20 restaurants for pagination"
+  mariana.ortiz@example.com OWNER "$mariana_id" "20 restaurants; menu on $cafe_id"
 echo
 echo "Restaurants: $parrilla_id La Parrilla de Carlos, $sushi_id Sushi Zen 88, $napoli_id Pizzería Bella Napoli"
 echo "Pagination catalog: 20 restaurants of Mariana ($mariana_id), created after those three"
+echo "Empty menu: $zumos_id Zumos Tropicales. Paged menu: $cafe_id Café Andino, 12 dishes"
 echo "Dishes of La Parrilla de Carlos: $churrasco_id $costillas_id $ensalada_id $limonada_id"
 echo "Dishes of Sushi Zen 88: $california_id $nigiri_id $te_id"
 echo "Dishes of Pizzería Bella Napoli: $margarita_id $pepperoni_id $lasana_id $tiramisu_id"
