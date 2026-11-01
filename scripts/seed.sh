@@ -348,6 +348,34 @@ if [[ $(jq -r .totalItems <<< "$carnes") != 2 \
 fi
 echo "Cafe Andino totalItems=12"
 
+echo "Order (HU 11)"
+order_body="$(jq -n \
+  --argjson restaurantId "$parrilla_id" \
+  --argjson churrasco "$churrasco_id" \
+  --argjson limonada "$limonada_id" \
+  '{restaurantId: $restaurantId, lines: [
+      {dishId: $churrasco, quantity: 1},
+      {dishId: $limonada, quantity: 2}
+    ]}')"
+order="$(call POST "$plaza_url/orders" "$camila_token" "$order_body" 201)"
+order_id="$(jq -r .id <<< "$order")"
+if [[ $(jq -r .status <<< "$order") != PENDING \
+    || $(jq -r .restaurantId <<< "$order") != "$parrilla_id" \
+    || $(jq -r .customerId <<< "$order") != "$camila_id" \
+    || $(jq -r .assignedEmployeeId <<< "$order") != "null" \
+    || $(jq -r 'has("pinHash")' <<< "$order") != false \
+    || $(jq -r '.lines | length' <<< "$order") != 2 \
+    || $(jq -r '.lines[0].dishId' <<< "$order") != "$churrasco_id" \
+    || $(jq -r '.lines[0].quantity' <<< "$order") != 1 \
+    || $(jq -r '.lines[1].dishId' <<< "$order") != "$limonada_id" \
+    || $(jq -r '.lines[1].quantity' <<< "$order") != 2 ]]; then
+  echo "POST /orders did not store Camila's order as PENDING." >&2
+  echo "$order" >&2
+  exit 1
+fi
+call POST "$plaza_url/orders" "$camila_token" "$order_body" 409 > /dev/null
+echo "Camila order $order_id is PENDING. A second order was rejected."
+
 echo
 echo "Seed loaded. Every seeded account uses the password: $seed_password"
 printf '%-28s %-14s %4s  %s\n' "Email" "Role" "Id" "Restaurant id"
@@ -370,3 +398,4 @@ echo "Empty menu: $zumos_id Zumos Tropicales. Paged menu: $cafe_id Café Andino,
 echo "Dishes of La Parrilla de Carlos: $churrasco_id $costillas_id $ensalada_id $limonada_id"
 echo "Dishes of Sushi Zen 88: $california_id $nigiri_id $te_id"
 echo "Dishes of Pizzería Bella Napoli: $margarita_id $pepperoni_id $lasana_id $tiramisu_id"
+echo "Camila's order: $order_id PENDING at La Parrilla de Carlos. Mateo has no order."

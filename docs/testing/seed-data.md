@@ -2,7 +2,7 @@
 
 `scripts/seed.sh` loads a known set of accounts, restaurants, and dishes through the public API. Each row goes through the same validation, bcrypt hashing, and ownership checks as a manual call, so the seed only contains data the services accept.
 
-The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), HU 9 (the restaurant list), and HU 10 (the menu of a restaurant). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. Orders do not exist yet; extend the script when HU 11 adds its endpoint.
+The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), HU 9 (the restaurant list), HU 10 (the menu of a restaurant), and HU 11 (one order). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. Camila has one `PENDING` order. Mateo has none, so a manual call can place his.
 
 ## Contents
 
@@ -10,6 +10,7 @@ The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants
 - [Accounts](#accounts)
 - [Restaurants](#restaurants)
 - [Dishes](#dishes)
+- [Orders](#orders)
 - [Get a token](#get-a-token)
 - [Manual test cases](#manual-test-cases)
 
@@ -71,7 +72,7 @@ Each account has a purpose in the tests:
 - Laura owns one restaurant. She is the "other owner" for the 403 cases.
 - Andrés is an owner without a restaurant. He can receive a new restaurant (HU 2) and is rejected when he creates employees or dishes.
 - La Parrilla de Carlos, Sushi Zen 88, and Pizzería Bella Napoli each have at least one employee for the order stories.
-- Camila and Mateo are customers. HU 11 can give one of them an order in progress and leave the other free to order. Camila is also the caller for the restaurant list and for each restaurant menu.
+- Camila and Mateo are customers. Camila has one `PENDING` order at La Parrilla de Carlos, so a second order from her is rejected. Mateo has no order and can place one. Camila is also the caller for the restaurant list and for each restaurant menu.
 - Mariana owns the twenty restaurants added for pagination. Café Andino has the twelve dishes used to page a menu. She has no employees. The other nineteen restaurants of hers have no dishes.
 
 ## Restaurants
@@ -144,6 +145,16 @@ Café Andino (id 5) has twelve more dishes, created by Mariana in an order that 
 | 23 | Limonada de panela | Bebidas | 6500 | 9 |
 
 All twenty-three dishes are active. A default page of Café Andino returns the first ten names and leaves Muffin and Waffle on the second page.
+
+## Orders
+
+Camila places one order through `POST /orders` after the menus exist. Mateo does not. The customer id comes from her token. The order starts as `PENDING`, with no assigned employee and no PIN. A second call with the same body is rejected, which is the one-order-in-progress rule.
+
+| Id | Customer | Restaurant | Status | Lines |
+| --- | --- | --- | --- | --- |
+| 1 | 9 Camila | 1 La Parrilla de Carlos | `PENDING` | Churrasco (1) quantity 1, Limonada de coco (4) quantity 2 |
+
+`IN_PREPARATION` and `READY` also block a new order. This endpoint cannot create them; the use case tests cover those statuses, and `DELIVERED` or `CANCELLED` do not block. A database that already lets Carlos log in is left unchanged. Load this order with a fresh volume.
 
 ## Get a token
 
@@ -364,3 +375,41 @@ A customer calls it. `page` starts at 0 and defaults to 0. `size` defaults to 10
 | Disabled dish | Carlos disables `/dishes/2`, then Camila lists `/restaurants/1/dishes` | 200, three items, Costillas BBQ absent, `totalItems` 3 |
 | Owner, administrator, or employee | Carlos, the administrator, or Pedro | 403 |
 | No token | no `Authorization` header | 401 |
+
+### Place an order (HU 11), `POST /orders`
+
+A customer calls it. The customer id comes from the token. The body is the restaurant and the lines (`dishId`, `quantity`). `status`, `customerId`, `assignedEmployeeId`, and `pin` are rejected. The stored order is `PENDING`. `assignedEmployeeId` is null. The response has no `pinHash`. `Location` is `/orders/{id}`.
+
+Camila already has order 1, so she cannot place another. Mateo can. Quantity is a whole number from 1 to 50, and an order has from 1 to 20 lines. The same dish cannot appear twice.
+
+| Case | Caller and body | Expected |
+| --- | --- | --- |
+| First order | Mateo, restaurant 1, Churrasco quantity 1 and Limonada de coco quantity 2 | 201, `status` `PENDING`, `assignedEmployeeId` null, no `pinHash`, `Location: /orders/{id}` |
+| Second order while `PENDING` | Camila, the same body as her seeded order | 409 "The customer already has an order in progress" |
+| Dish of another restaurant | Mateo, restaurant 1 and Pizza Margarita (dish 8) | 409 "The dish does not belong to this restaurant" |
+| Inactive dish | Carlos disables dish 2, then Mateo orders it at restaurant 1 | 409 "This dish is not available" |
+| Unknown dish | Mateo, `dishId` 999 | 404 |
+| Unknown restaurant | Mateo, `restaurantId` 999 | 404 |
+| Empty lines | Mateo, `"lines": []` | 400 |
+| Quantity zero, 51, or 1.5 | Mateo | 400 |
+| Repeated dish | Mateo, Churrasco twice | 400 |
+| Extra field | Mateo, `"status": "DELIVERED"` or `"customerId": 10` | 400 |
+| More than 20 lines | Mateo | 400 |
+| Owner, administrator, or employee | Carlos, the administrator, or Pedro | 403 |
+| No token | no `Authorization` header | 401 |
+| user-service stopped | Mateo, after user-service is down | 503 |
+
+`IN_PREPARATION` and `READY` are not creatable here. The use case rejects them when the repository reports an order in either status. `DELIVERED` and `CANCELLED` do not block a new order; those statuses arrive in later stories.
+
+Example body, the one the seed stores for Camila:
+
+```json
+{
+  "restaurantId": 1,
+  "lines": [
+    { "dishId": 1, "quantity": 1 },
+    { "dishId": 4, "quantity": 2 }
+  ]
+}
+```
+
