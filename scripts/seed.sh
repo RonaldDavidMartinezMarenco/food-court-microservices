@@ -139,6 +139,14 @@ create_customer() {
   call POST "$user_url/customers" "" "$body" 201 | jq -r .id
 }
 
+order_at() {
+  local restaurant=$1 email=$2 lines=$3 token body
+  token="$(login "$email" "$seed_password")"
+  body="$(jq -n --argjson restaurantId "$restaurant" --argjson lines "$lines" \
+    '{restaurantId: $restaurantId, lines: $lines}')"
+  call POST "$plaza_url/orders" "$token" "$body" 201 > /dev/null
+}
+
 wait_for user-service "$user_url"
 wait_for plaza-service "$plaza_url"
 
@@ -378,6 +386,67 @@ fi
 call POST "$plaza_url/orders" "$camila_token" "$order_body" 409 > /dev/null
 echo "Camila order $order_id is PENDING. A second order was rejected."
 
+echo "Orders for the employee list (HU 12)"
+# Eleven more PENDING orders at La Parrilla, then one at Sushi Zen. Mateo stays without an order.
+# Each customer can hold only one order in progress, so each row is a different account.
+parrilla_orders=(
+  "Lucía|Navarro|3030303003|+573003330003|lucia.navarro@example.com|$(jq -cn --argjson dish "$churrasco_id" '[{dishId:$dish,quantity:2}]')"
+  "Diego|Castaño|3030303004|+573003330004|diego.castano@example.com|$(jq -cn --argjson dish "$costillas_id" '[{dishId:$dish,quantity:1}]')"
+  "Elena|Ruiz|3030303005|+573003330005|elena.ruiz@example.com|$(jq -cn --argjson dish "$ensalada_id" '[{dishId:$dish,quantity:2}]')"
+  "Hugo|Peña|3030303006|+573003330006|hugo.pena@example.com|$(jq -cn --argjson dish "$limonada_id" '[{dishId:$dish,quantity:1}]')"
+  "Irene|Solís|3030303007|+573003330007|irene.solis@example.com|$(jq -cn --argjson a "$churrasco_id" --argjson b "$costillas_id" '[{dishId:$a,quantity:1},{dishId:$b,quantity:1}]')"
+  "Julián|Mora|3030303008|+573003330008|julian.mora@example.com|$(jq -cn --argjson a "$ensalada_id" --argjson b "$limonada_id" '[{dishId:$a,quantity:1},{dishId:$b,quantity:2}]')"
+  "Karla|Díaz|3030303009|+573003330009|karla.diaz@example.com|$(jq -cn --argjson a "$churrasco_id" --argjson b "$ensalada_id" '[{dishId:$a,quantity:2},{dishId:$b,quantity:1}]')"
+  "Nicolás|Gil|3030303010|+573003330010|nicolas.gil@example.com|$(jq -cn --argjson a "$costillas_id" --argjson b "$limonada_id" '[{dishId:$a,quantity:2},{dishId:$b,quantity:1}]')"
+  "Olga|Pardo|3030303011|+573003330011|olga.pardo@example.com|$(jq -cn --argjson a "$churrasco_id" --argjson b "$limonada_id" '[{dishId:$a,quantity:1},{dishId:$b,quantity:1}]')"
+  "Pablo|Ríos|3030303012|+573003330012|pablo.rios@example.com|$(jq -cn --argjson a "$costillas_id" --argjson b "$ensalada_id" '[{dishId:$a,quantity:1},{dishId:$b,quantity:2}]')"
+  "Rosa|Méndez|3030303013|+573003330013|rosa.mendez@example.com|$(jq -cn --argjson a "$ensalada_id" --argjson b "$limonada_id" '[{dishId:$a,quantity:1},{dishId:$b,quantity:1}]')"
+)
+for entry in "${parrilla_orders[@]}"; do
+  IFS='|' read -r first last document phone email lines <<< "$entry"
+  customer_id="$(create_customer "$first" "$last" "$document" "$phone" "$email")"
+  order_at "$parrilla_id" "$email" "$lines"
+  echo "customer $customer_id ordered at La Parrilla"
+done
+sushi_customer="$(create_customer Sara Kim 3030303014 +573003330014 sara.kim@example.com)"
+order_at "$sushi_id" sara.kim@example.com "$(jq -cn --argjson dish "$california_id" '[{dishId:$dish,quantity:1}]')"
+echo "customer $sushi_customer ordered at Sushi Zen"
+
+pedro_token="$(login pedro.martinez@example.com "$seed_password")"
+sofia_token="$(login sofia.herrera@example.com "$seed_password")"
+kenji_token="$(login kenji.morales@example.com "$seed_password")"
+valentina_token="$(login valentina.rossi@example.com "$seed_password")"
+pending_page="$(call GET "$plaza_url/orders?status=PENDING&page=0&size=10" "$pedro_token" "" 200)"
+pending_next="$(call GET "$plaza_url/orders?status=PENDING&page=1&size=10" "$pedro_token" "" 200)"
+preparing="$(call GET "$plaza_url/orders?status=IN_PREPARATION" "$pedro_token" "" 200)"
+sofia_page="$(call GET "$plaza_url/orders?status=PENDING&page=0&size=10" "$sofia_token" "" 200)"
+kenji_page="$(call GET "$plaza_url/orders?status=PENDING" "$kenji_token" "" 200)"
+valentina_page="$(call GET "$plaza_url/orders?status=PENDING" "$valentina_token" "" 200)"
+if ! jq -e --argjson restaurant "$parrilla_id" --argjson first "$order_id" '
+    .totalItems == 12 and .totalPages == 2 and (.items | length) == 10 and .items[0].id == $first
+    and all(.items[]; .status == "PENDING" and .restaurantId == $restaurant and .assignedEmployeeId == null and (has("pinHash") | not))
+  ' <<< "$pending_page" > /dev/null \
+  || ! jq -e --argjson restaurant "$parrilla_id" '
+    .totalItems == 12 and (.items | length) == 2
+    and all(.items[]; .restaurantId == $restaurant and .status == "PENDING")
+  ' <<< "$pending_next" > /dev/null \
+  || ! jq -e '.totalItems == 0 and .totalPages == 0 and (.items | length) == 0' <<< "$preparing" > /dev/null \
+  || [[ $(jq -r .totalItems <<< "$sofia_page") != 12 || $(jq -r '.items[0].id' <<< "$sofia_page") != "$order_id" ]] \
+  || ! jq -e --argjson restaurant "$sushi_id" --argjson foreign "$order_id" '
+    .totalItems == 1 and .items[0].restaurantId == $restaurant and .items[0].id != $foreign
+  ' <<< "$kenji_page" > /dev/null \
+  || ! jq -e '.totalItems == 0 and .totalPages == 0' <<< "$valentina_page" > /dev/null; then
+  echo "GET /orders did not match the seeded restaurant queues." >&2
+  echo "$pending_page" >&2
+  exit 1
+fi
+call GET "$plaza_url/orders?status=PENDING" "$camila_token" "" 403 > /dev/null
+call GET "$plaza_url/orders?status=PENDING" "$carlos_token" "" 403 > /dev/null
+call GET "$plaza_url/orders?status=PENDING" "$admin_token" "" 403 > /dev/null
+call GET "$plaza_url/orders?status=PENDIENTE" "$pedro_token" "" 400 > /dev/null
+call GET "$plaza_url/orders" "$pedro_token" "" 400 > /dev/null
+echo "Pedro sees 12 PENDING orders at La Parrilla. Kenji sees the Sushi order. Valentina sees none."
+
 echo
 echo "Seed loaded. Every seeded account uses the password: $seed_password"
 printf '%-28s %-14s %4s  %s\n' "Email" "Role" "Id" "Restaurant id"
@@ -400,4 +469,4 @@ echo "Empty menu: $zumos_id Zumos Tropicales. Paged menu: $cafe_id Café Andino,
 echo "Dishes of La Parrilla de Carlos: $churrasco_id $costillas_id $ensalada_id $limonada_id"
 echo "Dishes of Sushi Zen 88: $california_id $nigiri_id $te_id"
 echo "Dishes of Pizzería Bella Napoli: $margarita_id $pepperoni_id $lasana_id $tiramisu_id"
-echo "Camila's order: $order_id PENDING at La Parrilla de Carlos. Mateo has no order."
+echo "Orders: Camila $order_id plus 11 PENDING at La Parrilla (12 total) and 1 PENDING at Sushi Zen. Mateo has no order."
