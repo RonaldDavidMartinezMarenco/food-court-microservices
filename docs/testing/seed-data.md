@@ -2,7 +2,7 @@
 
 `scripts/seed.sh` loads a known set of accounts, restaurants, and dishes through the public API. Each row goes through the same validation, bcrypt hashing, and ownership checks as a manual call, so the seed only contains data the services accept.
 
-The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), HU 9 (the restaurant list), HU 10 (the menu of a restaurant), HU 11 (placing an order), and HU 12 (the employee order list). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. La Parrilla de Carlos has twelve `PENDING` orders, so an employee can page them. Sushi Zen 88 has one. Mateo has none, so a manual call can place his.
+The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), HU 9 (the restaurant list), HU 10 (the menu of a restaurant), HU 11 (placing an order), HU 12 (the employee order list), and HU 13 (an employee assigns a pending order). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. La Parrilla de Carlos places twelve `PENDING` orders, then Pedro assigns Camila's, so the restaurant ends with one `IN_PREPARATION` and eleven `PENDING`. Sushi Zen 88 has one `PENDING` order. Mateo has none, so a manual call can place his.
 
 ## Contents
 
@@ -72,7 +72,7 @@ Each account has a purpose in the tests:
 - Laura owns one restaurant. She is the "other owner" for the 403 cases.
 - Andrés is an owner without a restaurant. He can receive a new restaurant (HU 2) and is rejected when he creates employees or dishes.
 - La Parrilla de Carlos, Sushi Zen 88, and Pizzería Bella Napoli each have at least one employee for the order stories.
-- Camila and Mateo are customers. Camila has one `PENDING` order at La Parrilla de Carlos, so a second order from her is rejected. Mateo has no order and can place one. Camila is also the caller for the restaurant list and for each restaurant menu. Eleven more customers each hold one `PENDING` order at La Parrilla, and Sara holds one at Sushi Zen, so the employee list can be paged and kept inside one restaurant.
+- Camila and Mateo are customers. Camila's order at La Parrilla de Carlos starts as `PENDING` and ends `IN_PREPARATION`, assigned to Pedro, so a second order from her is still rejected. Mateo has no order and can place one. Camila is also the caller for the restaurant list and for each restaurant menu. Eleven more customers each hold one `PENDING` order at La Parrilla, and Sara holds one at Sushi Zen, so the employee list can be paged and kept inside one restaurant.
 - Mariana owns the twenty restaurants added for pagination. Café Andino has the twelve dishes used to page a menu. She has no employees. The other nineteen restaurants of hers have no dishes.
 
 ## Restaurants
@@ -148,11 +148,11 @@ All twenty-three dishes are active. A default page of Café Andino returns the f
 
 ## Orders
 
-Customers place orders through `POST /orders` after the menus exist. Mateo does not. The customer id comes from the token. Every stored order starts as `PENDING`, with no assigned employee and no PIN. A second call from the same customer is rejected, which is the one-order-in-progress rule. Later statuses are not created here, because this endpoint cannot write them.
+Customers place orders through `POST /orders` after the menus exist. Mateo does not. The customer id comes from the token. Every stored order starts as `PENDING`, with no assigned employee and no PIN. A second call from the same customer is rejected, which is the one-order-in-progress rule. `POST /orders` cannot write a later status. After the list checks, Pedro assigns Camila's order, so that one row ends as `IN_PREPARATION`.
 
 | Id | Customer | Restaurant | Status | Lines |
 | --- | --- | --- | --- | --- |
-| 1 | 9 Camila Restrepo | 1 La Parrilla de Carlos | `PENDING` | Churrasco (1) quantity 1, Limonada de coco (4) quantity 2 |
+| 1 | 9 Camila Restrepo | 1 La Parrilla de Carlos | `IN_PREPARATION`, employee 5 Pedro | Churrasco (1) quantity 1, Limonada de coco (4) quantity 2 |
 | 2 | 12 Lucía Navarro | 1 | `PENDING` | Churrasco quantity 2 |
 | 3 | 13 Diego Castaño | 1 | `PENDING` | Costillas BBQ quantity 1 |
 | 4 | 14 Elena Ruiz | 1 | `PENDING` | Ensalada de la casa quantity 2 |
@@ -168,7 +168,7 @@ Customers place orders through `POST /orders` after the menus exist. Mateo does 
 
 The extra customers use password `Password123`. Documents run from `3030303003` to `3030303014`, phones from `+573003330003` to `+573003330014`, and emails are `lucia.navarro@example.com`, `diego.castano@example.com`, `elena.ruiz@example.com`, `hugo.pena@example.com`, `irene.solis@example.com`, `julian.mora@example.com`, `karla.diaz@example.com`, `nicolas.gil@example.com`, `olga.pardo@example.com`, `pablo.rios@example.com`, `rosa.mendez@example.com`, and `sara.kim@example.com`.
 
-Pedro and Sofía both belong to restaurant 1, so both see orders 1 to 12. Kenji sees only order 13. Valentina sees none. A page of 10 leaves orders 11 and 12 on the second page. `IN_PREPARATION`, `READY`, `DELIVERED`, and `CANCELLED` are empty until a later story writes them.
+Pedro and Sofía both belong to restaurant 1. Before Pedro assigns order 1, both see twelve `PENDING` orders and an empty `IN_PREPARATION` page. After that assignment they see eleven `PENDING` orders and Camila's order in `IN_PREPARATION`. Kenji sees only order 13. Valentina sees none. A page of 10 of the final pending list leaves order 12 alone on the second page. `READY`, `DELIVERED`, and `CANCELLED` stay empty.
 
 `IN_PREPARATION` and `READY` also block a new order. This endpoint cannot create them; the use case tests cover those statuses, and `DELIVERED` or `CANCELLED` do not block. A database that already lets Carlos log in is left unchanged. Load these orders with a fresh volume.
 
@@ -434,17 +434,20 @@ Placing Mateo's order at La Parrilla adds a thirteenth `PENDING` order there and
 
 ### List orders by status (HU 12), `GET /orders`
 
-An employee calls it. `status` is required and must be exactly one of `PENDING`, `IN_PREPARATION`, `READY`, `DELIVERED`, or `CANCELLED`. `page` starts at 0 and defaults to 0. `size` defaults to 10 and cannot exceed 50. The restaurant is the one on the employee account. A `sort` parameter and a `restaurantId` parameter are ignored. The order is the id. Each item has `id`, `customerId`, `restaurantId`, `status`, `assignedEmployeeId`, and `lines`. `assignedEmployeeId` is present and null on every seeded order. `pinHash` is absent. An empty page is 200 with `totalPages` 0.
+An employee calls it. `status` is required and must be exactly one of `PENDING`, `IN_PREPARATION`, `READY`, `DELIVERED`, or `CANCELLED`. `page` starts at 0 and defaults to 0. `size` defaults to 10 and cannot exceed 50. The restaurant is the one on the employee account. A `sort` parameter and a `restaurantId` parameter are ignored. The order is the id. Each item has `id`, `customerId`, `restaurantId`, `status`, `assignedEmployeeId`, and `lines`. `pinHash` is absent. An empty page is 200 with `totalPages` 0.
+
+The rows below are the database after the seed finishes, once Pedro has taken Camila's order. The script checks the twelve pending orders before that call.
 
 | Case | Caller and query | Expected |
 | --- | --- | --- |
-| First page | Pedro, `status=PENDING&page=0&size=10` | 200, 10 items, `totalItems` 12, `totalPages` 2, first id 1, all restaurant 1 and `PENDING` |
-| Second page | Pedro, `status=PENDING&page=1&size=10` | 200, orders 11 and 12 |
+| First page | Pedro, `status=PENDING&page=0&size=10` | 200, 10 items, `totalItems` 11, `totalPages` 2, first id 2, all restaurant 1 and `PENDING`, order 1 absent, `assignedEmployeeId` null |
+| Second page | Pedro, `status=PENDING&page=1&size=10` | 200, one item, order 12 |
 | Same restaurant, other employee | Sofía, `status=PENDING&page=0&size=10` | 200, same total and same first id as Pedro |
 | Other restaurant | Kenji, `status=PENDING` | 200, one item, restaurant 2, not order 1 |
 | Restaurant with no orders | Valentina, `status=PENDING` | 200, `totalItems` 0, `totalPages` 0 |
-| Another status | Pedro, `status=IN_PREPARATION` | 200, empty page. The same for `READY`, `DELIVERED`, and `CANCELLED` |
-| Page past the end | Pedro, `status=PENDING&page=2&size=10` | 200 with `items: []` and `totalItems` 12 |
+| Preparation | Pedro, `status=IN_PREPARATION` | 200, one item, order 1, `assignedEmployeeId` 5, restaurant 1. Sofía sees the same item |
+| Other statuses | Pedro, `status=READY`, `DELIVERED`, or `CANCELLED` | 200, empty page |
+| Page past the end | Pedro, `status=PENDING&page=2&size=10` | 200 with `items: []` and `totalItems` 11 |
 | Missing status | Pedro, no query | 400 |
 | Unknown or Spanish status | Pedro, `status=PENDIENTE` or `status=pending` | 400 |
 | Two statuses | Pedro, `status=PENDING&status=READY` | 400 |
@@ -452,4 +455,38 @@ An employee calls it. `status` is required and must be exactly one of `PENDING`,
 | Sort or restaurant parameter | Pedro, `status=PENDING&sort=id,desc&restaurantId=2` | 200, still restaurant 1, still id order |
 | Customer, owner, or administrator | Camila, Carlos, or the administrator | 403, even when the status is invalid |
 | No token | no `Authorization` header | 401 |
+
+### Assign an order (HU 13), `POST /orders/{orderId}/assignment`
+
+An employee calls it. There is no body. The employee id comes from the token and the restaurant comes from the employee account. The order must be `PENDING` and unassigned. The response is the same order with `status` `IN_PREPARATION` and `assignedEmployeeId` set. `pinHash` is absent. A second call is 409: the transition is not repeated as a success.
+
+The seed already assigned order 1 to Pedro. `READY`, `DELIVERED`, and `CANCELLED` are not stored by this script; the use case tests reject those statuses.
+
+| Case | Caller and path | Expected |
+| --- | --- | --- |
+| Take Camila's order | Pedro, `POST /orders/1/assignment`, run before the seed's own assignment, or against a database where that order is still `PENDING` | 200, `status` `IN_PREPARATION`, `assignedEmployeeId` 5, same lines, no `pinHash` |
+| After the seed | Pedro, `POST /orders/1/assignment` | 409 "The order is IN_PREPARATION and cannot be assigned" |
+| Other employee of the same restaurant | Sofía, `POST /orders/1/assignment` | 409, same detail |
+| Other restaurant | Kenji or Valentina, `POST /orders/1/assignment` | 404 "No order exists for this id" |
+| Unknown id | Pedro, `POST /orders/999/assignment` | 404 |
+| Id zero or text | Pedro, `/orders/0/assignment` or `/orders/abc/assignment` | 400 |
+| Customer, owner, or administrator | Camila, Carlos, or the administrator | 403 |
+| No token | no `Authorization` header | 401 |
+| Customer still blocked | Camila, `POST /orders` with her original body | 409 "The customer already has an order in progress" |
+
+Example response, Camila's order after Pedro takes it:
+
+```json
+{
+  "id": 1,
+  "customerId": 9,
+  "restaurantId": 1,
+  "status": "IN_PREPARATION",
+  "assignedEmployeeId": 5,
+  "lines": [
+    { "dishId": 1, "quantity": 1 },
+    { "dishId": 4, "quantity": 2 }
+  ]
+}
+```
 

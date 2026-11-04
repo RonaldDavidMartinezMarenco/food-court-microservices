@@ -447,6 +447,56 @@ call GET "$plaza_url/orders?status=PENDIENTE" "$pedro_token" "" 400 > /dev/null
 call GET "$plaza_url/orders" "$pedro_token" "" 400 > /dev/null
 echo "Pedro sees 12 PENDING orders at La Parrilla. Kenji sees the Sushi order. Valentina sees none."
 
+echo "Assign order (HU 13)"
+assigned="$(call POST "$plaza_url/orders/$order_id/assignment" "$pedro_token" "" 200)"
+if [[ $(jq -r .status <<< "$assigned") != IN_PREPARATION \
+    || $(jq -r .id <<< "$assigned") != "$order_id" \
+    || $(jq -r .customerId <<< "$assigned") != "$camila_id" \
+    || $(jq -r .restaurantId <<< "$assigned") != "$parrilla_id" \
+    || $(jq -r .assignedEmployeeId <<< "$assigned") != "$pedro_id" \
+    || $(jq -r 'has("pinHash")' <<< "$assigned") != false \
+    || $(jq -r '.lines | length' <<< "$assigned") != 2 \
+    || $(jq -r '.lines[0].dishId' <<< "$assigned") != "$churrasco_id" \
+    || $(jq -r '.lines[0].quantity' <<< "$assigned") != 1 \
+    || $(jq -r '.lines[1].dishId' <<< "$assigned") != "$limonada_id" \
+    || $(jq -r '.lines[1].quantity' <<< "$assigned") != 2 ]]; then
+  echo "POST /orders/{id}/assignment did not move Camila's order to IN_PREPARATION." >&2
+  echo "$assigned" >&2
+  exit 1
+fi
+pending_after="$(call GET "$plaza_url/orders?status=PENDING&page=0&size=10" "$pedro_token" "" 200)"
+preparing_after="$(call GET "$plaza_url/orders?status=IN_PREPARATION" "$pedro_token" "" 200)"
+sofia_preparing="$(call GET "$plaza_url/orders?status=IN_PREPARATION" "$sofia_token" "" 200)"
+if ! jq -e --argjson restaurant "$parrilla_id" --argjson taken "$order_id" '
+    .totalItems == 11 and .totalPages == 2 and (.items | length) == 10
+    and all(.items[]; .status == "PENDING" and .restaurantId == $restaurant and .id != $taken and .assignedEmployeeId == null)
+  ' <<< "$pending_after" > /dev/null \
+  || ! jq -e --argjson restaurant "$parrilla_id" --argjson taken "$order_id" --argjson employee "$pedro_id" '
+    .totalItems == 1 and (.items | length) == 1
+    and .items[0].id == $taken and .items[0].status == "IN_PREPARATION"
+    and .items[0].assignedEmployeeId == $employee and .items[0].restaurantId == $restaurant
+    and (.items[0] | has("pinHash") | not)
+  ' <<< "$preparing_after" > /dev/null \
+  || ! jq -e --argjson taken "$order_id" --argjson employee "$pedro_id" '
+    .totalItems == 1 and .items[0].id == $taken and .items[0].assignedEmployeeId == $employee
+  ' <<< "$sofia_preparing" > /dev/null; then
+  echo "The queues did not reflect Camila's assignment." >&2
+  echo "$pending_after" >&2
+  echo "$preparing_after" >&2
+  exit 1
+fi
+call POST "$plaza_url/orders/$order_id/assignment" "$sofia_token" "" 409 > /dev/null
+call POST "$plaza_url/orders/$order_id/assignment" "$pedro_token" "" 409 > /dev/null
+call POST "$plaza_url/orders/$order_id/assignment" "$kenji_token" "" 404 > /dev/null
+call POST "$plaza_url/orders/$order_id/assignment" "$valentina_token" "" 404 > /dev/null
+call POST "$plaza_url/orders/$order_id/assignment" "$camila_token" "" 403 > /dev/null
+call POST "$plaza_url/orders/$order_id/assignment" "$carlos_token" "" 403 > /dev/null
+call POST "$plaza_url/orders/$order_id/assignment" "$admin_token" "" 403 > /dev/null
+call POST "$plaza_url/orders/0/assignment" "$pedro_token" "" 400 > /dev/null
+call POST "$plaza_url/orders/abc/assignment" "$pedro_token" "" 400 > /dev/null
+call POST "$plaza_url/orders" "$camila_token" "$order_body" 409 > /dev/null
+echo "Pedro took Camila's order. It is IN_PREPARATION. La Parrilla has 11 PENDING orders left."
+
 echo
 echo "Seed loaded. Every seeded account uses the password: $seed_password"
 printf '%-28s %-14s %4s  %s\n' "Email" "Role" "Id" "Restaurant id"
@@ -469,4 +519,4 @@ echo "Empty menu: $zumos_id Zumos Tropicales. Paged menu: $cafe_id Café Andino,
 echo "Dishes of La Parrilla de Carlos: $churrasco_id $costillas_id $ensalada_id $limonada_id"
 echo "Dishes of Sushi Zen 88: $california_id $nigiri_id $te_id"
 echo "Dishes of Pizzería Bella Napoli: $margarita_id $pepperoni_id $lasana_id $tiramisu_id"
-echo "Orders: Camila $order_id plus 11 PENDING at La Parrilla (12 total) and 1 PENDING at Sushi Zen. Mateo has no order."
+echo "Orders: Camila $order_id is IN_PREPARATION with Pedro $pedro_id. La Parrilla has 11 PENDING left. Sushi Zen has 1 PENDING. Mateo has no order."
