@@ -346,14 +346,14 @@ A customer calls it. `page` starts at 0 and defaults to 0. `size` defaults to 10
 
 ### List dishes (HU 10), `GET /restaurants/{restaurantId}/dishes`
 
-A customer calls it. `page` starts at 0 and defaults to 0. `size` defaults to 10 and cannot exceed 50. `category` is optional. When it is present, surrounding spaces are removed and repeated spaces become one, then the value must match the stored category, including capitals. The order is the dish name, then the id. A `sort` parameter is ignored. Inactive dishes are omitted from `items` and from the totals. Each item has `id`, `restaurantId`, `name`, `price`, `description`, `imageUrl`, and `category`.
+A customer calls it. `page` starts at 0 and defaults to 0. `size` defaults to 10 and cannot exceed 50. `category` is optional. When it is present, surrounding spaces are removed and repeated spaces become one, then the value matches the stored category without regard to capitals. Each returned category keeps the capitals stored on the dish. The order is the dish name, then the id. A `sort` parameter is ignored. Inactive dishes are omitted from `items` and from the totals. Each item has `id`, `restaurantId`, `name`, `price`, `description`, `imageUrl`, and `category`.
 
 | Case | Caller and query | Expected |
 | --- | --- | --- |
 | Whole small menu | Camila, `/restaurants/1/dishes` | 200, four items, `totalItems` 4, `totalPages` 1 |
 | Category of that restaurant | Camila, `/restaurants/1/dishes?category=Carnes` | 200, Churrasco then Costillas BBQ |
 | Same word, other restaurant | Camila, `/restaurants/1/dishes?category=Bebidas` | 200, only Limonada de coco |
-| Other case | Camila, `/restaurants/1/dishes?category=carnes` | 200 with `items: []`, `totalItems` 0, `totalPages` 0 |
+| Other case | Camila, `/restaurants/1/dishes?category=carnes` | 200, Churrasco then Costillas BBQ, and each `category` is still `Carnes` |
 | Surrounding spaces | Camila, `/restaurants/1/dishes?category=%20%20Carnes%20%20` | 200, the two Carnes dishes |
 | First page of a long menu | Camila, `/restaurants/5/dishes` | 200, 10 items, `totalItems` 12, `totalPages` 2, first name `Americano` |
 | Second page | Camila, `/restaurants/5/dishes?page=1&size=10` | 200, Muffin then Waffle |
