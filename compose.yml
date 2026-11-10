@@ -38,6 +38,7 @@ services:
       USER_SERVICE_URL: http://user-service:8081
       TRACEABILITY_SERVICE_URL: http://traceability-service:8083
       MESSAGING_SERVICE_URL: http://messaging-service:8084
+      APP_PIN_FIXED: ${SEED_PIN:-}
     ports:
       - "8082:8082"
     depends_on:
