@@ -154,7 +154,7 @@ order_at() {
   token="$(login "$email" "$seed_password")"
   body="$(jq -n --argjson restaurantId "$restaurant" --argjson lines "$lines" \
     '{restaurantId: $restaurantId, lines: $lines}')"
-  call POST "$plaza_url/orders" "$token" "$body" 201 > /dev/null
+  call POST "$plaza_url/orders" "$token" "$body" 201 | jq -r .id
 }
 
 wait_for user-service "$user_url"
@@ -412,15 +412,21 @@ parrilla_orders=(
   "Pablo|Ríos|3030303012|+573003330012|pablo.rios@example.com|$(jq -cn --argjson a "$costillas_id" --argjson b "$ensalada_id" '[{dishId:$a,quantity:1},{dishId:$b,quantity:2}]')"
   "Rosa|Méndez|3030303013|+573003330013|rosa.mendez@example.com|$(jq -cn --argjson a "$ensalada_id" --argjson b "$limonada_id" '[{dishId:$a,quantity:1},{dishId:$b,quantity:1}]')"
 )
+lucia_id=""
+lucia_order=""
 for entry in "${parrilla_orders[@]}"; do
   IFS='|' read -r first last document phone email lines <<< "$entry"
   customer_id="$(create_customer "$first" "$last" "$document" "$phone" "$email")"
-  order_at "$parrilla_id" "$email" "$lines"
-  echo "customer $customer_id ordered at La Parrilla"
+  created="$(order_at "$parrilla_id" "$email" "$lines")"
+  if [[ $email == lucia.navarro@example.com ]]; then
+    lucia_id="$customer_id"
+    lucia_order="$created"
+  fi
+  echo "customer $customer_id ordered $created at La Parrilla"
 done
 sushi_customer="$(create_customer Sara Kim 3030303014 +573003330014 sara.kim@example.com)"
-order_at "$sushi_id" sara.kim@example.com "$(jq -cn --argjson dish "$california_id" '[{dishId:$dish,quantity:1}]')"
-echo "customer $sushi_customer ordered at Sushi Zen"
+sushi_order="$(order_at "$sushi_id" sara.kim@example.com "$(jq -cn --argjson dish "$california_id" '[{dishId:$dish,quantity:1}]')")"
+echo "customer $sushi_customer ordered $sushi_order at Sushi Zen"
 
 pedro_token="$(login pedro.martinez@example.com "$seed_password")"
 sofia_token="$(login sofia.herrera@example.com "$seed_password")"
@@ -651,6 +657,106 @@ if ! jq -e --argjson taken "$order_id" --argjson employee "$pedro_id" --argjson 
 fi
 echo "Pedro delivered Ronald's order. Ronald placed order $next_id. La Parrilla has 12 PENDING orders."
 
+echo "Cancel order (HU 16)"
+cannot_cancel="Lo sentimos, tu pedido ya está en preparación y no puede cancelarse"
+if [[ -z ${lucia_order:-} || -z ${lucia_id:-} ]]; then
+  echo "Lucía's order id was not captured." >&2
+  exit 1
+fi
+lucia_token="$(login lucia.navarro@example.com "$seed_password")"
+diego_token="$(login diego.castano@example.com "$seed_password")"
+rejected="$(call POST "$plaza_url/orders/$order_id/cancellation" "$ronald_token" "" 409)"
+if [[ $(jq -r .detail <<< "$rejected") != "$cannot_cancel" ]]; then
+  echo "Cancelling a delivered order did not use the required sentence." >&2
+  echo "$rejected" >&2
+  exit 1
+fi
+call POST "$plaza_url/orders/$lucia_order/cancellation" "$pedro_token" "" 403 > /dev/null
+call POST "$plaza_url/orders/$lucia_order/cancellation" "$sofia_token" "" 403 > /dev/null
+call POST "$plaza_url/orders/$lucia_order/cancellation" "$carlos_token" "" 403 > /dev/null
+call POST "$plaza_url/orders/$lucia_order/cancellation" "$admin_token" "" 403 > /dev/null
+call POST "$plaza_url/orders/$lucia_order/cancellation" "$ronald_token" "" 404 > /dev/null
+cancelled="$(call POST "$plaza_url/orders/$lucia_order/cancellation" "$lucia_token" "" 200)"
+if [[ $(jq -r .status <<< "$cancelled") != CANCELLED \
+    || $(jq -r .id <<< "$cancelled") != "$lucia_order" \
+    || $(jq -r .customerId <<< "$cancelled") != "$lucia_id" \
+    || $(jq -r .restaurantId <<< "$cancelled") != "$parrilla_id" \
+    || $(jq -r .assignedEmployeeId <<< "$cancelled") != "null" \
+    || $(jq -r 'has("pin")' <<< "$cancelled") != false \
+    || $(jq -r 'has("pinHash")' <<< "$cancelled") != false \
+    || $(jq -r '.lines | length' <<< "$cancelled") != 1 \
+    || $(jq -r '.lines[0].dishId' <<< "$cancelled") != "$churrasco_id" \
+    || $(jq -r '.lines[0].quantity' <<< "$cancelled") != 2 ]]; then
+  echo "POST /orders/{id}/cancellation did not cancel Lucía's order." >&2
+  echo "$cancelled" >&2
+  exit 1
+fi
+again="$(call POST "$plaza_url/orders/$lucia_order/cancellation" "$lucia_token" "" 409)"
+if [[ $(jq -r .detail <<< "$again") != "$cannot_cancel" ]]; then
+  echo "A second cancellation did not use the required sentence." >&2
+  echo "$again" >&2
+  exit 1
+fi
+call POST "$plaza_url/orders/$lucia_order/cancellation" "$diego_token" "" 404 > /dev/null
+call POST "$plaza_url/orders/$lucia_order/cancellation" "" "" 401 > /dev/null
+call POST "$plaza_url/orders/0/cancellation" "$lucia_token" "" 400 > /dev/null
+call POST "$plaza_url/orders/abc/cancellation" "$lucia_token" "" 400 > /dev/null
+call POST "$plaza_url/orders/999/cancellation" "$lucia_token" "" 404 > /dev/null
+lucia_body="$(jq -n --argjson restaurantId "$parrilla_id" --argjson dish "$churrasco_id" \
+  '{restaurantId: $restaurantId, lines: [{dishId: $dish, quantity: 2}]}')"
+lucia_next="$(call POST "$plaza_url/orders" "$lucia_token" "$lucia_body" 201)"
+lucia_next_id="$(jq -r .id <<< "$lucia_next")"
+if [[ $(jq -r .status <<< "$lucia_next") != PENDING \
+    || $(jq -r .customerId <<< "$lucia_next") != "$lucia_id" \
+    || $(jq -r .restaurantId <<< "$lucia_next") != "$parrilla_id" \
+    || $(jq -r .assignedEmployeeId <<< "$lucia_next") != "null" \
+    || $(jq -r 'has("pinHash")' <<< "$lucia_next") != false \
+    || $(jq -r '.lines | length' <<< "$lucia_next") != 1 \
+    || $(jq -r '.lines[0].dishId' <<< "$lucia_next") != "$churrasco_id" \
+    || $(jq -r '.lines[0].quantity' <<< "$lucia_next") != 2 ]]; then
+  echo "Lucía could not place another order after cancelling." >&2
+  echo "$lucia_next" >&2
+  exit 1
+fi
+call POST "$plaza_url/orders" "$lucia_token" "$lucia_body" 409 > /dev/null
+cancelled_page="$(call GET "$plaza_url/orders?status=CANCELLED" "$pedro_token" "" 200)"
+delivered_still="$(call GET "$plaza_url/orders?status=DELIVERED" "$pedro_token" "" 200)"
+preparing_clear="$(call GET "$plaza_url/orders?status=IN_PREPARATION" "$pedro_token" "" 200)"
+ready_clear="$(call GET "$plaza_url/orders?status=READY" "$pedro_token" "" 200)"
+pending_after_cancel="$(call GET "$plaza_url/orders?status=PENDING&page=0&size=10" "$pedro_token" "" 200)"
+pending_after_last="$(call GET "$plaza_url/orders?status=PENDING&page=1&size=10" "$pedro_token" "" 200)"
+if ! jq -e --argjson cancelled "$lucia_order" --argjson customer "$lucia_id" --argjson restaurant "$parrilla_id" '
+    .totalItems == 1 and (.items | length) == 1
+    and .items[0].id == $cancelled and .items[0].status == "CANCELLED"
+    and .items[0].customerId == $customer and .items[0].restaurantId == $restaurant
+    and .items[0].assignedEmployeeId == null
+    and (.items[0] | has("pinHash") | not)
+  ' <<< "$cancelled_page" > /dev/null \
+  || ! jq -e --argjson taken "$order_id" '
+    .totalItems == 1 and .items[0].id == $taken and .items[0].status == "DELIVERED"
+  ' <<< "$delivered_still" > /dev/null \
+  || ! jq -e '.totalItems == 0 and (.items | length) == 0' <<< "$preparing_clear" > /dev/null \
+  || ! jq -e '.totalItems == 0 and (.items | length) == 0' <<< "$ready_clear" > /dev/null \
+  || ! jq -e --argjson restaurant "$parrilla_id" --argjson cancelled "$lucia_order" \
+      --argjson next "$lucia_next_id" --argjson ronald "$next_id" '
+    .totalItems == 12 and .totalPages == 2 and (.items | length) == 10
+    and all(.items[]; .status == "PENDING" and .restaurantId == $restaurant
+      and .id != $cancelled and .id != $next and .id != $ronald)
+  ' <<< "$pending_after_cancel" > /dev/null \
+  || ! jq -e --argjson restaurant "$parrilla_id" --argjson next "$lucia_next_id" --argjson ronald "$next_id" '
+    .totalItems == 12 and (.items | length) == 2
+    and .items[0].id == $ronald and .items[0].status == "PENDING"
+    and .items[1].id == $next and .items[1].status == "PENDING"
+    and .items[0].restaurantId == $restaurant and .items[1].restaurantId == $restaurant
+  ' <<< "$pending_after_last" > /dev/null; then
+  echo "The queues did not reflect Lucía's cancellation." >&2
+  echo "$cancelled_page" >&2
+  echo "$pending_after_cancel" >&2
+  echo "$pending_after_last" >&2
+  exit 1
+fi
+echo "Lucía cancelled order $lucia_order and placed order $lucia_next_id."
+
 echo
 echo "Seed loaded. Every seeded account uses the password: $seed_password"
 printf '%-28s %-14s %4s  %s\n' "Email" "Role" "Id" "Restaurant id"
@@ -673,4 +779,4 @@ echo "Empty menu: $zumos_id Zumos Tropicales. Paged menu: $cafe_id Café Andino,
 echo "Dishes of La Parrilla de Carlos: $churrasco_id $costillas_id $ensalada_id $limonada_id"
 echo "Dishes of Sushi Zen 88: $california_id $nigiri_id $te_id"
 echo "Dishes of Pizzería Bella Napoli: $margarita_id $pepperoni_id $lasana_id $tiramisu_id"
-echo "Orders: Ronald $order_id is DELIVERED with Pedro $pedro_id. Ronald $next_id is PENDING. La Parrilla has 12 PENDING. Sushi Zen has 1 PENDING. Mateo has no order."
+echo "Orders: Ronald $order_id is DELIVERED with Pedro $pedro_id. Ronald $next_id is PENDING. Lucía $lucia_order is CANCELLED. Lucía $lucia_next_id is PENDING. La Parrilla has 12 PENDING and 1 CANCELLED. Sushi Zen has 1 PENDING. Mateo has no order."

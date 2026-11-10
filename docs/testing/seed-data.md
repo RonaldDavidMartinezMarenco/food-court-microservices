@@ -2,7 +2,7 @@
 
 `scripts/seed.sh` loads a known set of accounts, restaurants, and dishes through the public API. Each row goes through the same validation, bcrypt hashing, and ownership checks as a manual call, so the seed only contains data the services accept.
 
-The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), HU 9 (the restaurant list), HU 10 (the menu of a restaurant), HU 11 (placing an order), HU 12 (the employee order list), HU 13 (an employee assigns a pending order), HU 14 (that employee marks it ready and the customer receives the PIN by SMS), and HU 15 (that employee delivers it with the PIN). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. La Parrilla de Carlos places twelve `PENDING` orders, then Pedro assigns Ronald's, marks it ready, and delivers it. Ronald places one more order, so the restaurant ends with one `DELIVERED` and twelve `PENDING`. Sushi Zen 88 has one `PENDING` order. Mateo has none, so a manual call can place his.
+The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), HU 9 (the restaurant list), HU 10 (the menu of a restaurant), HU 11 (placing an order), HU 12 (the employee order list), HU 13 (an employee assigns a pending order), HU 14 (that employee marks it ready and the customer receives the PIN by SMS), HU 15 (that employee delivers it with the PIN), and HU 16 (a customer cancels a pending order). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. La Parrilla de Carlos places twelve `PENDING` orders, then Pedro assigns Ronald's, marks it ready, and delivers it. Ronald places one more order. Lucía cancels hers and places another, so the restaurant ends with one `DELIVERED`, one `CANCELLED`, and twelve `PENDING`. Sushi Zen 88 has one `PENDING` order. Mateo has none, so a manual call can place his.
 
 ## Contents
 
@@ -75,7 +75,7 @@ Each account has a purpose in the tests:
 - Laura owns one restaurant. She is the "other owner" for the 403 cases.
 - Andrés is an owner without a restaurant. He can receive a new restaurant (HU 2) and is rejected when he creates employees or dishes.
 - La Parrilla de Carlos, Sushi Zen 88, and Pizzería Bella Napoli each have at least one employee for the order stories.
-- Ronald and Mateo are customers. Ronald's order at La Parrilla de Carlos starts as `PENDING`, moves to `IN_PREPARATION` with Pedro, becomes `READY`, and ends `DELIVERED`. He then places a second order, which stays `PENDING`. The ready-order SMS goes to `+573011590640` and carries `SEED_PIN`. Mateo has no order and can place one. Ronald is also the caller for the restaurant list and for each restaurant menu. Eleven more customers each hold one `PENDING` order at La Parrilla, and Sara holds one at Sushi Zen, so the employee list can be paged and kept inside one restaurant.
+- Ronald and Mateo are customers. Ronald's order at La Parrilla de Carlos starts as `PENDING`, moves to `IN_PREPARATION` with Pedro, becomes `READY`, and ends `DELIVERED`. He then places a second order, which stays `PENDING`. The ready-order SMS goes to `+573011590640` and carries `SEED_PIN`. Mateo has no order and can place one. Ronald is also the caller for the restaurant list and for each restaurant menu. Eleven more customers each hold one `PENDING` order at La Parrilla, and Sara holds one at Sushi Zen, so the employee list can be paged and kept inside one restaurant. Lucía later cancels her first order and places another.
 - Mariana owns the twenty restaurants added for pagination. Café Andino has the twelve dishes used to page a menu. She has no employees. The other nineteen restaurants of hers have no dishes.
 
 ## Restaurants
@@ -151,12 +151,12 @@ All twenty-three dishes are active. A default page of Café Andino returns the f
 
 ## Orders
 
-Customers place orders through `POST /orders` after the menus exist. Mateo does not. The customer id comes from the token. Every stored order starts as `PENDING`, with no assigned employee and no PIN. A second call from the same customer is rejected while that order is still in progress. `POST /orders` cannot write a later status. After the list checks, Pedro assigns Ronald's order and later marks it ready and delivers it. Ronald then places order 14.
+Customers place orders through `POST /orders` after the menus exist. Mateo does not. The customer id comes from the token. Every stored order starts as `PENDING`, with no assigned employee and no PIN. A second call from the same customer is rejected while that order is still in progress. `POST /orders` cannot write a later status. After the list checks, Pedro assigns Ronald's order and later marks it ready and delivers it. Ronald then places order 14. Lucía cancels order 2 and places order 15.
 
 | Id | Customer | Restaurant | Status | Lines |
 | --- | --- | --- | --- | --- |
 | 1 | 9 Ronald Martínez | 1 La Parrilla de Carlos | `DELIVERED`, employee 5 Pedro | Churrasco (1) quantity 1, Limonada de coco (4) quantity 2 |
-| 2 | 12 Lucía Navarro | 1 | `PENDING` | Churrasco quantity 2 |
+| 2 | 12 Lucía Navarro | 1 | `CANCELLED` | Churrasco quantity 2 |
 | 3 | 13 Diego Castaño | 1 | `PENDING` | Costillas BBQ quantity 1 |
 | 4 | 14 Elena Ruiz | 1 | `PENDING` | Ensalada de la casa quantity 2 |
 | 5 | 15 Hugo Peña | 1 | `PENDING` | Limonada de coco quantity 1 |
@@ -169,12 +169,13 @@ Customers place orders through `POST /orders` after the menus exist. Mateo does 
 | 12 | 22 Rosa Méndez | 1 | `PENDING` | Ensalada de la casa quantity 1, Limonada de coco quantity 1 |
 | 13 | 23 Sara Kim | 2 Sushi Zen 88 | `PENDING` | Roll California (5) quantity 1 |
 | 14 | 9 Ronald Martínez | 1 La Parrilla de Carlos | `PENDING` | Churrasco (1) quantity 1, Limonada de coco (4) quantity 2 |
+| 15 | 12 Lucía Navarro | 1 | `PENDING` | Churrasco quantity 2 |
 
 The extra customers use password `Password123`. Documents run from `3030303003` to `3030303014`, phones from `+573003330003` to `+573003330014`, and emails are `lucia.navarro@example.com`, `diego.castano@example.com`, `elena.ruiz@example.com`, `hugo.pena@example.com`, `irene.solis@example.com`, `julian.mora@example.com`, `karla.diaz@example.com`, `nicolas.gil@example.com`, `olga.pardo@example.com`, `pablo.rios@example.com`, `rosa.mendez@example.com`, and `sara.kim@example.com`.
 
-Pedro and Sofía both belong to restaurant 1. Before Pedro assigns order 1, both see twelve `PENDING` orders and an empty `IN_PREPARATION` page. After that assignment they see eleven `PENDING` orders and Ronald's order in `IN_PREPARATION`. Kenji sees only order 13. Valentina sees none. A page of 10 of the pending list leaves order 12 alone on the second page. The script then marks order 1 `READY` and delivers it. Ronald places order 14, so a finished seed has order 1 `DELIVERED`, twelve `PENDING` orders at La Parrilla (2 through 12, and 14), and an empty preparation page and an empty ready page. A page of 10 leaves orders 12 and 14 on the second page. `CANCELLED` stays empty.
+Pedro and Sofía both belong to restaurant 1. Before Pedro assigns order 1, both see twelve `PENDING` orders and an empty `IN_PREPARATION` page. After that assignment they see eleven `PENDING` orders and Ronald's order in `IN_PREPARATION`. Kenji sees only order 13. Valentina sees none. A page of 10 of the pending list leaves order 12 alone on the second page. The script then marks order 1 `READY` and delivers it. Ronald places order 14. Lucía cancels order 2 and places order 15, so a finished seed has order 1 `DELIVERED`, order 2 `CANCELLED`, and twelve `PENDING` orders at La Parrilla (3 through 12, 14, and 15). Preparation and ready pages are empty. A page of 10 leaves orders 14 and 15 on the second page.
 
-`IN_PREPARATION` and `READY` also block a new order. This endpoint cannot create them; the use case tests cover those statuses. `DELIVERED` does not block, which is why Ronald can place order 14. `CANCELLED` does not block either; that status arrives in a later story. A database that already lets Carlos log in is left unchanged. Load these orders with a fresh volume.
+`IN_PREPARATION` and `READY` also block a new order. This endpoint cannot create them; the use case tests cover those statuses. `DELIVERED` does not block, which is why Ronald can place order 14. `CANCELLED` does not block either, which is why Lucía can place order 15. A database that already lets Carlos log in is left unchanged. Load these orders with a fresh volume.
 
 ## Get a token
 
@@ -420,7 +421,7 @@ Ronald already has order 1, so she cannot place another. Mateo can. Quantity is 
 | No token | no `Authorization` header | 401 |
 | user-service stopped | Mateo, after user-service is down | 503 |
 
-`IN_PREPARATION` and `READY` are not creatable here. The use case rejects them when the repository reports an order in either status. `DELIVERED` does not block a new order; the seed places Ronald's second order after delivery. `CANCELLED` does not block either and arrives in a later story.
+`IN_PREPARATION` and `READY` are not creatable here. The use case rejects them when the repository reports an order in either status. `DELIVERED` does not block a new order; the seed places Ronald's second order after delivery. `CANCELLED` does not block either; the seed places Lucía's second order after she cancels the first.
 
 Example body, the one the seed stores for Ronald:
 
@@ -440,7 +441,7 @@ Placing Mateo's order at La Parrilla adds a thirteenth `PENDING` order there and
 
 An employee calls it. `status` is required and must be exactly one of `PENDING`, `IN_PREPARATION`, `READY`, `DELIVERED`, or `CANCELLED`. `page` starts at 0 and defaults to 0. `size` defaults to 10 and cannot exceed 50. The restaurant is the one on the employee account. A `sort` parameter and a `restaurantId` parameter are ignored. The order is the id. Each item has `id`, `customerId`, `restaurantId`, `status`, `assignedEmployeeId`, and `lines`. `pinHash` is absent. An empty page is 200 with `totalPages` 0.
 
-The rows below are the queues after Pedro has taken Ronald's order and before the script marks it ready. The script checks the twelve pending orders before that call. A finished seed has moved order 1 to `DELIVERED` and Ronald has placed order 14, so La Parrilla then has 12 `PENDING` orders (ids 2 through 12 and 14). Page 2 of size 10 holds orders 12 and 14. `READY` and `IN_PREPARATION` are empty, and `DELIVERED` contains order 1. Kenji still sees only order 13.
+The rows below are the queues after Pedro has taken Ronald's order and before the script marks it ready. The script checks the twelve pending orders before that call. A finished seed has moved order 1 to `DELIVERED` and order 2 to `CANCELLED`. Ronald has placed order 14 and Lucía has placed order 15, so La Parrilla then has 12 `PENDING` orders (ids 3 through 12, 14, and 15). Page 2 of size 10 holds orders 14 and 15. `READY` and `IN_PREPARATION` are empty, `DELIVERED` contains order 1, and `CANCELLED` contains order 2. Kenji still sees only order 13.
 
 | Case | Caller and query | Expected |
 | --- | --- | --- |
@@ -464,7 +465,7 @@ The rows below are the queues after Pedro has taken Ronald's order and before th
 
 An employee calls it. There is no body. The employee id comes from the token and the restaurant comes from the employee account. The order must be `PENDING` and unassigned. The response is the same order with `status` `IN_PREPARATION` and `assignedEmployeeId` set. `pinHash` is absent. A second call is 409: the transition is not repeated as a success.
 
-The seed assigns order 1 to Pedro, marks it ready, and then delivers it. After the script finishes, a second assignment is rejected because the order is `DELIVERED`. `CANCELLED` is not stored by this script; the use case tests reject that status.
+The seed assigns order 1 to Pedro, marks it ready, and then delivers it. After the script finishes, a second assignment is rejected because the order is `DELIVERED`. Order 2 is `CANCELLED`; assigning it is rejected by the same rule.
 
 | Case | Caller and path | Expected |
 | --- | --- | --- |
@@ -571,6 +572,40 @@ Example response, Ronald's order after Pedro delivers it:
   "lines": [
     { "dishId": 1, "quantity": 1 },
     { "dishId": 4, "quantity": 2 }
+  ]
+}
+```
+
+### Cancel an order (HU 16), `POST /orders/{orderId}/cancellation`
+
+A customer calls it. There is no body. The customer id comes from the token. The order must belong to that customer and be `PENDING`. The response is the same order with `status` `CANCELLED`. Lines stay. `assignedEmployeeId` stays null on a pending order. `pin` and `pinHash` are absent. A second call is 409. The detail is exactly `Lo sentimos, tu pedido ya está en preparación y no puede cancelarse` for every status other than `PENDING`, including `IN_PREPARATION`, `READY`, `DELIVERED`, and `CANCELLED`.
+
+After the seed, order 2 is already `CANCELLED` and Lucía's new order is 15, so her call on order 2 is the 409 and another `POST /orders` from her is 409 again. Run the success call before the script's own cancellation, while order 2 is still `PENDING`.
+
+| Case | Caller and path | Expected |
+| --- | --- | --- |
+| Cancel Lucía's order | Lucía, `POST /orders/2/cancellation`, while it is still `PENDING` | 200, `status` `CANCELLED`, `customerId` 12, `restaurantId` 1, `assignedEmployeeId` null, Churrasco quantity 2, no `pin`, no `pinHash` |
+| After the seed | Lucía, `POST /orders/2/cancellation` | 409 "Lo sentimos, tu pedido ya está en preparación y no puede cancelarse" |
+| Delivered order | Ronald, `POST /orders/1/cancellation` | 409, the same sentence, order stays `DELIVERED` |
+| Another customer's order | Ronald or Diego, `POST /orders/2/cancellation` | 404 "No order exists for this id" |
+| Unknown id | Lucía, `POST /orders/999/cancellation` | 404 |
+| Id zero or text | Lucía, `/orders/0/cancellation` or `/orders/abc/cancellation` | 400 |
+| Employee, owner, or administrator | Pedro, Sofía, Carlos, or the administrator | 403 |
+| No token | no `Authorization` header | 401 |
+| Customer can order again | Lucía, `POST /orders` with restaurant 1 and Churrasco quantity 2, after cancellation and before order 15 exists | 201, `status` `PENDING` |
+| Customer blocked again | Lucía, same body after order 15 exists | 409 "The customer already has an order in progress" |
+
+Example response, Lucía's order after she cancels it:
+
+```json
+{
+  "id": 2,
+  "customerId": 12,
+  "restaurantId": 1,
+  "status": "CANCELLED",
+  "assignedEmployeeId": null,
+  "lines": [
+    { "dishId": 1, "quantity": 2 }
   ]
 }
 ```
