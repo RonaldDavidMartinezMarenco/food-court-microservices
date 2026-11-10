@@ -54,11 +54,16 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/traceability_db
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL: ${JWT_TTL:-PT8H}
+      USER_SERVICE_URL: http://user-service:8081
     ports:
       - "8083:8083"
     depends_on:
       postgres:
         condition: service_healthy
+      user-service:
+        condition: service_started
 
   messaging-service:
     build: ./messaging-service
