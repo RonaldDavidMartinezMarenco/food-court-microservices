@@ -2,7 +2,7 @@
 
 `scripts/seed.sh` loads a known set of accounts, restaurants, and dishes through the public API. Each row goes through the same validation, bcrypt hashing, and ownership checks as a manual call, so the seed only contains data the services accept.
 
-The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), HU 9 (the restaurant list), HU 10 (the menu of a restaurant), HU 11 (placing an order), HU 12 (the employee order list), and HU 13 (an employee assigns a pending order). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. La Parrilla de Carlos places twelve `PENDING` orders, then Pedro assigns Camila's, so the restaurant ends with one `IN_PREPARATION` and eleven `PENDING`. Sushi Zen 88 has one `PENDING` order. Mateo has none, so a manual call can place his.
+The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), HU 9 (the restaurant list), HU 10 (the menu of a restaurant), HU 11 (placing an order), HU 12 (the employee order list), HU 13 (an employee assigns a pending order), and HU 14 (that employee marks it ready and the customer receives the PIN by SMS). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. La Parrilla de Carlos places twelve `PENDING` orders, then Pedro assigns Ronald's and marks it ready, so the restaurant ends with one `READY` and eleven `PENDING`. Sushi Zen 88 has one `PENDING` order. Mateo has none, so a manual call can place his.
 
 ## Contents
 
@@ -60,7 +60,7 @@ Every seeded account uses the password `Password123`. The administrator uses the
 | 6 | `EMPLOYEE` | Sofía Herrera | `sofia.herrera@example.com` | `2020202020` | `+573002220002` | 1 |
 | 7 | `EMPLOYEE` | Kenji Morales | `kenji.morales@example.com` | `2030303030` | `+573002220003` | 2 |
 | 8 | `EMPLOYEE` | Valentina Rossi | `valentina.rossi@example.com` | `2040404040` | `+573002220004` | 3 |
-| 9 | `CUSTOMER` | Camila Restrepo | `camila.restrepo@example.com` | `3010101010` | `+573003330001` | |
+| 9 | `CUSTOMER` | Ronald Martínez | `ronald.martinez@example.com` | `3011590640` | `+573011590640` | |
 | 10 | `CUSTOMER` | Mateo Vargas | `mateo.vargas@example.com` | `3020202020` | `+573003330002` | |
 | 11 | `OWNER` | Mariana Ortiz | `mariana.ortiz@example.com` | `1050505050` | `+573001110005` | 4 to 23 |
 
@@ -72,7 +72,7 @@ Each account has a purpose in the tests:
 - Laura owns one restaurant. She is the "other owner" for the 403 cases.
 - Andrés is an owner without a restaurant. He can receive a new restaurant (HU 2) and is rejected when he creates employees or dishes.
 - La Parrilla de Carlos, Sushi Zen 88, and Pizzería Bella Napoli each have at least one employee for the order stories.
-- Camila and Mateo are customers. Camila's order at La Parrilla de Carlos starts as `PENDING` and ends `IN_PREPARATION`, assigned to Pedro, so a second order from her is still rejected. Mateo has no order and can place one. Camila is also the caller for the restaurant list and for each restaurant menu. Eleven more customers each hold one `PENDING` order at La Parrilla, and Sara holds one at Sushi Zen, so the employee list can be paged and kept inside one restaurant.
+- Ronald and Mateo are customers. Ronald's order at La Parrilla de Carlos starts as `PENDING`, moves to `IN_PREPARATION` with Pedro, and ends `READY`. A second order from him is still rejected. The ready-order SMS goes to `+573011590640`. Mateo has no order and can place one. Ronald is also the caller for the restaurant list and for each restaurant menu. Eleven more customers each hold one `PENDING` order at La Parrilla, and Sara holds one at Sushi Zen, so the employee list can be paged and kept inside one restaurant.
 - Mariana owns the twenty restaurants added for pagination. Café Andino has the twelve dishes used to page a menu. She has no employees. The other nineteen restaurants of hers have no dishes.
 
 ## Restaurants
@@ -148,11 +148,11 @@ All twenty-three dishes are active. A default page of Café Andino returns the f
 
 ## Orders
 
-Customers place orders through `POST /orders` after the menus exist. Mateo does not. The customer id comes from the token. Every stored order starts as `PENDING`, with no assigned employee and no PIN. A second call from the same customer is rejected, which is the one-order-in-progress rule. `POST /orders` cannot write a later status. After the list checks, Pedro assigns Camila's order, so that one row ends as `IN_PREPARATION`.
+Customers place orders through `POST /orders` after the menus exist. Mateo does not. The customer id comes from the token. Every stored order starts as `PENDING`, with no assigned employee and no PIN. A second call from the same customer is rejected, which is the one-order-in-progress rule. `POST /orders` cannot write a later status. After the list checks, Pedro assigns Ronald's order, so that one row ends as `IN_PREPARATION`.
 
 | Id | Customer | Restaurant | Status | Lines |
 | --- | --- | --- | --- | --- |
-| 1 | 9 Camila Restrepo | 1 La Parrilla de Carlos | `IN_PREPARATION`, employee 5 Pedro | Churrasco (1) quantity 1, Limonada de coco (4) quantity 2 |
+| 1 | 9 Ronald Martínez | 1 La Parrilla de Carlos | `READY`, employee 5 Pedro | Churrasco (1) quantity 1, Limonada de coco (4) quantity 2 |
 | 2 | 12 Lucía Navarro | 1 | `PENDING` | Churrasco quantity 2 |
 | 3 | 13 Diego Castaño | 1 | `PENDING` | Costillas BBQ quantity 1 |
 | 4 | 14 Elena Ruiz | 1 | `PENDING` | Ensalada de la casa quantity 2 |
@@ -168,7 +168,7 @@ Customers place orders through `POST /orders` after the menus exist. Mateo does 
 
 The extra customers use password `Password123`. Documents run from `3030303003` to `3030303014`, phones from `+573003330003` to `+573003330014`, and emails are `lucia.navarro@example.com`, `diego.castano@example.com`, `elena.ruiz@example.com`, `hugo.pena@example.com`, `irene.solis@example.com`, `julian.mora@example.com`, `karla.diaz@example.com`, `nicolas.gil@example.com`, `olga.pardo@example.com`, `pablo.rios@example.com`, `rosa.mendez@example.com`, and `sara.kim@example.com`.
 
-Pedro and Sofía both belong to restaurant 1. Before Pedro assigns order 1, both see twelve `PENDING` orders and an empty `IN_PREPARATION` page. After that assignment they see eleven `PENDING` orders and Camila's order in `IN_PREPARATION`. Kenji sees only order 13. Valentina sees none. A page of 10 of the final pending list leaves order 12 alone on the second page. `READY`, `DELIVERED`, and `CANCELLED` stay empty.
+Pedro and Sofía both belong to restaurant 1. Before Pedro assigns order 1, both see twelve `PENDING` orders and an empty `IN_PREPARATION` page. After that assignment they see eleven `PENDING` orders and Ronald's order in `IN_PREPARATION`. Kenji sees only order 13. Valentina sees none. A page of 10 of the pending list leaves order 12 alone on the second page. The script then marks order 1 `READY`, so a finished seed has that one ready order, an empty preparation page, and the same eleven pending orders. `DELIVERED` and `CANCELLED` stay empty.
 
 `IN_PREPARATION` and `READY` also block a new order. This endpoint cannot create them; the use case tests cover those statuses, and `DELIVERED` or `CANCELLED` do not block. A database that already lets Carlos log in is left unchanged. Load these orders with a fresh volume.
 
@@ -319,7 +319,7 @@ The call needs no access token. `roleId` must be `4` (`CUSTOMER`). The body acce
 | --- | --- | --- |
 | New customer | New email and document, `roleId` 4, no token | 201 with `role: CUSTOMER` and `Location: /users/{id}` |
 | Same customer again | The email just registered | 409 |
-| Document in use | `3010101010` | 409 |
+| Document in use | `3011590640` | 409 |
 | Role other than customer | `roleId` 1 | 400 "The role must be CUSTOMER" |
 | Extra field | `"restaurantId": 5` | 400 |
 | Role id as text or a decimal | `"roleId": "4"` or `4.5` | 400 |
@@ -331,11 +331,11 @@ Example body:
 
 ```json
 {
-  "firstName": "Camila",
-  "lastName": "Restrepo",
-  "identityDocument": "3010101010",
-  "phone": "+573003330001",
-  "email": "camila.restrepo@example.com",
+  "firstName": "Ronald",
+  "lastName": "Martínez",
+  "identityDocument": "3011590640",
+  "phone": "+573011590640",
+  "email": "ronald.martinez@example.com",
   "password": "Password123",
   "roleId": 4
 }
@@ -347,17 +347,17 @@ A customer calls it. `page` starts at 0 and defaults to 0. `size` defaults to 10
 
 | Case | Caller and query | Expected |
 | --- | --- | --- |
-| First page | Camila, no query | 200, 10 items, `totalItems` 23, `totalPages` 3, first name `7 Mares Cevichería` |
-| Second page | Camila, `page=1&size=10` | 200, `Nono Pasta Fresca` before `Ñapa Antioqueña` |
-| Last page | Camila, `page=2&size=10` | 200, three items: `Sushi Zen 88`, `Wok Express`, `Zumos Tropicales` |
-| Page past the end | Camila, `page=3&size=10` | 200 with `items: []` and the same totals |
-| Whole catalog | Camila, `size=50` | 200 with 23 items |
-| Size above 50 | Camila, `size=51` | 400 |
-| Size zero | Camila, `size=0` | 400 |
-| Negative page | Camila, `page=-1` | 400 |
-| Page that is not an integer | Camila, `page=abc` | 400 |
-| Offset past the integer range | Camila, `page=2147483647` | 400 |
-| Sort parameter | Camila, `sort=nit,desc` | 200, same order as the first page |
+| First page | Ronald, no query | 200, 10 items, `totalItems` 23, `totalPages` 3, first name `7 Mares Cevichería` |
+| Second page | Ronald, `page=1&size=10` | 200, `Nono Pasta Fresca` before `Ñapa Antioqueña` |
+| Last page | Ronald, `page=2&size=10` | 200, three items: `Sushi Zen 88`, `Wok Express`, `Zumos Tropicales` |
+| Page past the end | Ronald, `page=3&size=10` | 200 with `items: []` and the same totals |
+| Whole catalog | Ronald, `size=50` | 200 with 23 items |
+| Size above 50 | Ronald, `size=51` | 400 |
+| Size zero | Ronald, `size=0` | 400 |
+| Negative page | Ronald, `page=-1` | 400 |
+| Page that is not an integer | Ronald, `page=abc` | 400 |
+| Offset past the integer range | Ronald, `page=2147483647` | 400 |
+| Sort parameter | Ronald, `sort=nit,desc` | 200, same order as the first page |
 | Owner, administrator, or employee | Carlos, the administrator, or Pedro | 403 |
 | No token | no `Authorization` header | 401 |
 
@@ -367,29 +367,29 @@ A customer calls it. `page` starts at 0 and defaults to 0. `size` defaults to 10
 
 | Case | Caller and query | Expected |
 | --- | --- | --- |
-| Whole small menu | Camila, `/restaurants/1/dishes` | 200, four items, `totalItems` 4, `totalPages` 1 |
-| Category of that restaurant | Camila, `/restaurants/1/dishes?category=Carnes` | 200, Churrasco then Costillas BBQ |
-| Same word, other restaurant | Camila, `/restaurants/1/dishes?category=Bebidas` | 200, only Limonada de coco |
-| Other case | Camila, `/restaurants/1/dishes?category=carnes` | 200, Churrasco then Costillas BBQ, and each `category` is still `Carnes` |
-| Surrounding spaces | Camila, `/restaurants/1/dishes?category=%20%20Carnes%20%20` | 200, the two Carnes dishes |
-| First page of a long menu | Camila, `/restaurants/5/dishes` | 200, 10 items, `totalItems` 12, `totalPages` 2, first name `Americano` |
-| Second page | Camila, `/restaurants/5/dishes?page=1&size=10` | 200, Muffin then Waffle |
-| Category on that menu | Camila, `/restaurants/5/dishes?category=Bebidas` | 200, Jugo de naranja then Limonada de panela |
-| Restaurant without dishes | Camila, `/restaurants/4/dishes` | 200 with `items: []`, `totalItems` 0, `totalPages` 0 |
-| Page past the end | Camila, `/restaurants/1/dishes?page=1&size=10` | 200 with `items: []` and `totalItems` 4 |
-| Category that is not on the menu | Camila, `/restaurants/1/dishes?category=Pizzas` | 200 with `items: []` |
-| Size above 50 | Camila, `/restaurants/1/dishes?size=51` | 400 |
-| Size zero | Camila, `/restaurants/1/dishes?size=0` | 400 |
-| Negative page | Camila, `/restaurants/1/dishes?page=-1` | 400 |
-| Page that is not an integer | Camila, `/restaurants/1/dishes?page=abc` | 400 |
-| Offset past the integer range | Camila, `/restaurants/1/dishes?page=2147483647` | 400 |
-| Empty category | Camila, `/restaurants/1/dishes?category=` | 400 |
-| Digits only | Camila, `/restaurants/1/dishes?category=123` | 400 |
-| Category longer than 50 | Camila, `/restaurants/1/dishes?category=` followed by 51 `a` | 400 |
-| Sort parameter | Camila, `/restaurants/1/dishes?sort=price,desc` | 200, same order as the whole small menu |
-| Id that is not positive | Camila, `/restaurants/0/dishes` | 400 |
-| Unknown restaurant | Camila, `/restaurants/999/dishes` | 404 |
-| Disabled dish | Carlos disables `/dishes/2`, then Camila lists `/restaurants/1/dishes` | 200, three items, Costillas BBQ absent, `totalItems` 3 |
+| Whole small menu | Ronald, `/restaurants/1/dishes` | 200, four items, `totalItems` 4, `totalPages` 1 |
+| Category of that restaurant | Ronald, `/restaurants/1/dishes?category=Carnes` | 200, Churrasco then Costillas BBQ |
+| Same word, other restaurant | Ronald, `/restaurants/1/dishes?category=Bebidas` | 200, only Limonada de coco |
+| Other case | Ronald, `/restaurants/1/dishes?category=carnes` | 200, Churrasco then Costillas BBQ, and each `category` is still `Carnes` |
+| Surrounding spaces | Ronald, `/restaurants/1/dishes?category=%20%20Carnes%20%20` | 200, the two Carnes dishes |
+| First page of a long menu | Ronald, `/restaurants/5/dishes` | 200, 10 items, `totalItems` 12, `totalPages` 2, first name `Americano` |
+| Second page | Ronald, `/restaurants/5/dishes?page=1&size=10` | 200, Muffin then Waffle |
+| Category on that menu | Ronald, `/restaurants/5/dishes?category=Bebidas` | 200, Jugo de naranja then Limonada de panela |
+| Restaurant without dishes | Ronald, `/restaurants/4/dishes` | 200 with `items: []`, `totalItems` 0, `totalPages` 0 |
+| Page past the end | Ronald, `/restaurants/1/dishes?page=1&size=10` | 200 with `items: []` and `totalItems` 4 |
+| Category that is not on the menu | Ronald, `/restaurants/1/dishes?category=Pizzas` | 200 with `items: []` |
+| Size above 50 | Ronald, `/restaurants/1/dishes?size=51` | 400 |
+| Size zero | Ronald, `/restaurants/1/dishes?size=0` | 400 |
+| Negative page | Ronald, `/restaurants/1/dishes?page=-1` | 400 |
+| Page that is not an integer | Ronald, `/restaurants/1/dishes?page=abc` | 400 |
+| Offset past the integer range | Ronald, `/restaurants/1/dishes?page=2147483647` | 400 |
+| Empty category | Ronald, `/restaurants/1/dishes?category=` | 400 |
+| Digits only | Ronald, `/restaurants/1/dishes?category=123` | 400 |
+| Category longer than 50 | Ronald, `/restaurants/1/dishes?category=` followed by 51 `a` | 400 |
+| Sort parameter | Ronald, `/restaurants/1/dishes?sort=price,desc` | 200, same order as the whole small menu |
+| Id that is not positive | Ronald, `/restaurants/0/dishes` | 400 |
+| Unknown restaurant | Ronald, `/restaurants/999/dishes` | 404 |
+| Disabled dish | Carlos disables `/dishes/2`, then Ronald lists `/restaurants/1/dishes` | 200, three items, Costillas BBQ absent, `totalItems` 3 |
 | Owner, administrator, or employee | Carlos, the administrator, or Pedro | 403 |
 | No token | no `Authorization` header | 401 |
 
@@ -397,12 +397,12 @@ A customer calls it. `page` starts at 0 and defaults to 0. `size` defaults to 10
 
 A customer calls it. The customer id comes from the token. The body is the restaurant and the lines (`dishId`, `quantity`). `status`, `customerId`, `assignedEmployeeId`, and `pin` are rejected. The stored order is `PENDING`. `assignedEmployeeId` is null. The response has no `pinHash`. `Location` is `/orders/{id}`.
 
-Camila already has order 1, so she cannot place another. Mateo can. Quantity is a whole number from 1 to 50, and an order has from 1 to 20 lines. The same dish cannot appear twice.
+Ronald already has order 1, so she cannot place another. Mateo can. Quantity is a whole number from 1 to 50, and an order has from 1 to 20 lines. The same dish cannot appear twice.
 
 | Case | Caller and body | Expected |
 | --- | --- | --- |
 | First order | Mateo, restaurant 1, Churrasco quantity 1 and Limonada de coco quantity 2 | 201, `status` `PENDING`, `assignedEmployeeId` null, no `pinHash`, `Location: /orders/{id}` |
-| Second order while `PENDING` | Camila, the same body as her seeded order | 409 "The customer already has an order in progress" |
+| Second order while `PENDING` | Ronald, the same body as his seeded order | 409 "The customer already has an order in progress" |
 | Dish of another restaurant | Mateo, restaurant 1 and Pizza Margarita (dish 8) | 409 "The dish does not belong to this restaurant" |
 | Inactive dish | Carlos disables dish 2, then Mateo orders it at restaurant 1 | 409 "This dish is not available" |
 | Unknown dish | Mateo, `dishId` 999 | 404 |
@@ -418,7 +418,7 @@ Camila already has order 1, so she cannot place another. Mateo can. Quantity is 
 
 `IN_PREPARATION` and `READY` are not creatable here. The use case rejects them when the repository reports an order in either status. `DELIVERED` and `CANCELLED` do not block a new order; those statuses arrive in later stories.
 
-Example body, the one the seed stores for Camila:
+Example body, the one the seed stores for Ronald:
 
 ```json
 {
@@ -436,7 +436,7 @@ Placing Mateo's order at La Parrilla adds a thirteenth `PENDING` order there and
 
 An employee calls it. `status` is required and must be exactly one of `PENDING`, `IN_PREPARATION`, `READY`, `DELIVERED`, or `CANCELLED`. `page` starts at 0 and defaults to 0. `size` defaults to 10 and cannot exceed 50. The restaurant is the one on the employee account. A `sort` parameter and a `restaurantId` parameter are ignored. The order is the id. Each item has `id`, `customerId`, `restaurantId`, `status`, `assignedEmployeeId`, and `lines`. `pinHash` is absent. An empty page is 200 with `totalPages` 0.
 
-The rows below are the database after the seed finishes, once Pedro has taken Camila's order. The script checks the twelve pending orders before that call.
+The rows below are the queues after Pedro has taken Ronald's order and before the script marks it ready. The script checks the twelve pending orders before that call.
 
 | Case | Caller and query | Expected |
 | --- | --- | --- |
@@ -453,28 +453,28 @@ The rows below are the database after the seed finishes, once Pedro has taken Ca
 | Two statuses | Pedro, `status=PENDING&status=READY` | 400 |
 | Size above 50, size zero, or negative page | Pedro | 400 |
 | Sort or restaurant parameter | Pedro, `status=PENDING&sort=id,desc&restaurantId=2` | 200, still restaurant 1, still id order |
-| Customer, owner, or administrator | Camila, Carlos, or the administrator | 403, even when the status is invalid |
+| Customer, owner, or administrator | Ronald, Carlos, or the administrator | 403, even when the status is invalid |
 | No token | no `Authorization` header | 401 |
 
 ### Assign an order (HU 13), `POST /orders/{orderId}/assignment`
 
 An employee calls it. There is no body. The employee id comes from the token and the restaurant comes from the employee account. The order must be `PENDING` and unassigned. The response is the same order with `status` `IN_PREPARATION` and `assignedEmployeeId` set. `pinHash` is absent. A second call is 409: the transition is not repeated as a success.
 
-The seed already assigned order 1 to Pedro. `READY`, `DELIVERED`, and `CANCELLED` are not stored by this script; the use case tests reject those statuses.
+The seed assigns order 1 to Pedro and then marks it ready. After the script finishes, a second assignment is rejected because the order is `READY`. `DELIVERED` and `CANCELLED` are not stored by this script; the use case tests reject those statuses.
 
 | Case | Caller and path | Expected |
 | --- | --- | --- |
-| Take Camila's order | Pedro, `POST /orders/1/assignment`, run before the seed's own assignment, or against a database where that order is still `PENDING` | 200, `status` `IN_PREPARATION`, `assignedEmployeeId` 5, same lines, no `pinHash` |
-| After the seed | Pedro, `POST /orders/1/assignment` | 409 "The order is IN_PREPARATION and cannot be assigned" |
+| Take Ronald's order | Pedro, `POST /orders/1/assignment`, run before the seed's own assignment, or against a database where that order is still `PENDING` | 200, `status` `IN_PREPARATION`, `assignedEmployeeId` 5, same lines, no `pinHash` |
+| After the seed | Pedro, `POST /orders/1/assignment` | 409 "The order is READY and cannot be assigned" |
 | Other employee of the same restaurant | Sofía, `POST /orders/1/assignment` | 409, same detail |
 | Other restaurant | Kenji or Valentina, `POST /orders/1/assignment` | 404 "No order exists for this id" |
 | Unknown id | Pedro, `POST /orders/999/assignment` | 404 |
 | Id zero or text | Pedro, `/orders/0/assignment` or `/orders/abc/assignment` | 400 |
-| Customer, owner, or administrator | Camila, Carlos, or the administrator | 403 |
+| Customer, owner, or administrator | Ronald, Carlos, or the administrator | 403 |
 | No token | no `Authorization` header | 401 |
-| Customer still blocked | Camila, `POST /orders` with her original body | 409 "The customer already has an order in progress" |
+| Customer still blocked | Ronald, `POST /orders` with his original body | 409 "The customer already has an order in progress" |
 
-Example response, Camila's order after Pedro takes it:
+Example response, Ronald's order after Pedro takes it:
 
 ```json
 {
@@ -482,6 +482,40 @@ Example response, Camila's order after Pedro takes it:
   "customerId": 9,
   "restaurantId": 1,
   "status": "IN_PREPARATION",
+  "assignedEmployeeId": 5,
+  "lines": [
+    { "dishId": 1, "quantity": 1 },
+    { "dishId": 4, "quantity": 2 }
+  ]
+}
+```
+
+### Mark an order ready (HU 14), `POST /orders/{orderId}/ready`
+
+An employee calls it. There is no body. The employee must be the one assigned to the order, and the order must be `IN_PREPARATION`. The response is the same order with `status` `READY`. `pin` and `pinHash` are absent. The PIN goes out by SMS to the customer's phone. A second call is 409 and does not send another PIN. If the SMS is rejected, the order stays `IN_PREPARATION`.
+
+The SMS goes out through textbee and the registered Android phone. The body is `Tu pedido #{id} de {restaurant} está listo.` and, on the next line, `Pin de seguridad: {pin}`. It arrives on an iPhone or an Android because it is a carrier SMS. The phone needs internet. It does not need to share a Wi-Fi network with these services. Without `TEXTBEE_API_KEY`, or if the phone is offline, the call returns 502 and the order stays `IN_PREPARATION`. `MESSAGING_PROVIDER=twilio` keeps the Twilio adapter available. A Twilio trial account still rejects this custom body.
+
+After the seed, order 1 is already `READY`, so Pedro's call below is the 409. Run the success call before the script's own ready step, or against a database where the order is still `IN_PREPARATION`.
+
+| Case | Caller and path | Expected |
+| --- | --- | --- |
+| Mark Ronald's order | Pedro, `POST /orders/1/ready`, while it is still `IN_PREPARATION` | 200, `status` `READY`, `assignedEmployeeId` 5, same lines, no `pin`, no `pinHash` |
+| After the seed | Pedro, `POST /orders/1/ready` | 409 "The order is READY and cannot be marked ready" |
+| Other employee of the same restaurant | Sofía, `POST /orders/1/ready` | 409 "The order is assigned to another employee" while it is `IN_PREPARATION`, or 409 with the stored status after the seed |
+| Other restaurant | Kenji or Valentina, `POST /orders/1/ready` | 404 "No order exists for this id" |
+| Customer, owner, or administrator | Ronald, Carlos, or the administrator | 403 |
+| No token | no `Authorization` header | 401 |
+| Customer still blocked | Ronald, `POST /orders` with his original body | 409 "The customer already has an order in progress" |
+
+Example response, Ronald's order after Pedro marks it ready:
+
+```json
+{
+  "id": 1,
+  "customerId": 9,
+  "restaurantId": 1,
+  "status": "READY",
   "assignedEmployeeId": 5,
   "lines": [
     { "dishId": 1, "quantity": 1 },

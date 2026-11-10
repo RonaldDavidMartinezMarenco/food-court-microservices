@@ -225,7 +225,7 @@ valentina_id="$(create_employee "$laura_token" Valentina Rossi 2040404040 +57300
   valentina.rossi@example.com "$napoli_id")"
 
 echo "Customers (HU 8)"
-camila_id="$(create_customer Camila Restrepo 3010101010 +573003330001 camila.restrepo@example.com)"
+ronald_id="$(create_customer Ronald "Martínez" 3011590640 +573011590640 ronald.martinez@example.com)"
 mateo_id="$(create_customer Mateo Vargas 3020202020 +573003330002 mateo.vargas@example.com)"
 
 echo "Restaurants for pagination (HU 9)"
@@ -310,13 +310,13 @@ create_dish "$mariana_token" "Limonada de panela" 6500 \
 
 for email in pedro.martinez@example.com sofia.herrera@example.com kenji.morales@example.com \
     valentina.rossi@example.com andres.torres@example.com \
-    camila.restrepo@example.com mateo.vargas@example.com mariana.ortiz@example.com; do
+    ronald.martinez@example.com mateo.vargas@example.com mariana.ortiz@example.com; do
   login "$email" "$seed_password" > /dev/null
 done
 
 echo "Restaurant list (HU 9)"
-camila_token="$(login camila.restrepo@example.com "$seed_password")"
-restaurant_page="$(call GET "$plaza_url/restaurants?page=0&size=10" "$camila_token" "" 200)"
+ronald_token="$(login ronald.martinez@example.com "$seed_password")"
+restaurant_page="$(call GET "$plaza_url/restaurants?page=0&size=10" "$ronald_token" "" 200)"
 total_items="$(jq -r .totalItems <<< "$restaurant_page")"
 first_name="$(jq -r '.items[0].name' <<< "$restaurant_page")"
 if [[ $total_items != 23 || $first_name != "7 Mares Cevichería" ]]; then
@@ -327,13 +327,13 @@ echo "totalItems=$total_items"
 jq -r '.items[].name' <<< "$restaurant_page"
 
 echo "Dish list (HU 10)"
-carnes="$(call GET "$plaza_url/restaurants/$parrilla_id/dishes?category=Carnes" "$camila_token" "" 200)"
-parrilla_bebidas="$(call GET "$plaza_url/restaurants/$parrilla_id/dishes?category=Bebidas" "$camila_token" "" 200)"
-lower_carnes="$(call GET "$plaza_url/restaurants/$parrilla_id/dishes?category=carnes" "$camila_token" "" 200)"
-cafe_first="$(call GET "$plaza_url/restaurants/$cafe_id/dishes?page=0&size=10" "$camila_token" "" 200)"
-cafe_second="$(call GET "$plaza_url/restaurants/$cafe_id/dishes?page=1&size=10" "$camila_token" "" 200)"
-cafe_bebidas="$(call GET "$plaza_url/restaurants/$cafe_id/dishes?category=Bebidas" "$camila_token" "" 200)"
-zumos_menu="$(call GET "$plaza_url/restaurants/$zumos_id/dishes" "$camila_token" "" 200)"
+carnes="$(call GET "$plaza_url/restaurants/$parrilla_id/dishes?category=Carnes" "$ronald_token" "" 200)"
+parrilla_bebidas="$(call GET "$plaza_url/restaurants/$parrilla_id/dishes?category=Bebidas" "$ronald_token" "" 200)"
+lower_carnes="$(call GET "$plaza_url/restaurants/$parrilla_id/dishes?category=carnes" "$ronald_token" "" 200)"
+cafe_first="$(call GET "$plaza_url/restaurants/$cafe_id/dishes?page=0&size=10" "$ronald_token" "" 200)"
+cafe_second="$(call GET "$plaza_url/restaurants/$cafe_id/dishes?page=1&size=10" "$ronald_token" "" 200)"
+cafe_bebidas="$(call GET "$plaza_url/restaurants/$cafe_id/dishes?category=Bebidas" "$ronald_token" "" 200)"
+zumos_menu="$(call GET "$plaza_url/restaurants/$zumos_id/dishes" "$ronald_token" "" 200)"
 if [[ $(jq -r .totalItems <<< "$carnes") != 2 \
     || $(jq -r .totalItems <<< "$parrilla_bebidas") != 1 \
     || $(jq -r '.items[0].name' <<< "$parrilla_bebidas") != "Limonada de coco" \
@@ -367,11 +367,11 @@ order_body="$(jq -n \
       {dishId: $churrasco, quantity: 1},
       {dishId: $limonada, quantity: 2}
     ]}')"
-order="$(call POST "$plaza_url/orders" "$camila_token" "$order_body" 201)"
+order="$(call POST "$plaza_url/orders" "$ronald_token" "$order_body" 201)"
 order_id="$(jq -r .id <<< "$order")"
 if [[ $(jq -r .status <<< "$order") != PENDING \
     || $(jq -r .restaurantId <<< "$order") != "$parrilla_id" \
-    || $(jq -r .customerId <<< "$order") != "$camila_id" \
+    || $(jq -r .customerId <<< "$order") != "$ronald_id" \
     || $(jq -r .assignedEmployeeId <<< "$order") != "null" \
     || $(jq -r 'has("pinHash")' <<< "$order") != false \
     || $(jq -r '.lines | length' <<< "$order") != 2 \
@@ -379,12 +379,12 @@ if [[ $(jq -r .status <<< "$order") != PENDING \
     || $(jq -r '.lines[0].quantity' <<< "$order") != 1 \
     || $(jq -r '.lines[1].dishId' <<< "$order") != "$limonada_id" \
     || $(jq -r '.lines[1].quantity' <<< "$order") != 2 ]]; then
-  echo "POST /orders did not store Camila's order as PENDING." >&2
+  echo "POST /orders did not store Ronald's order as PENDING." >&2
   echo "$order" >&2
   exit 1
 fi
-call POST "$plaza_url/orders" "$camila_token" "$order_body" 409 > /dev/null
-echo "Camila order $order_id is PENDING. A second order was rejected."
+call POST "$plaza_url/orders" "$ronald_token" "$order_body" 409 > /dev/null
+echo "Ronald order $order_id is PENDING. A second order was rejected."
 
 echo "Orders for the employee list (HU 12)"
 # Eleven more PENDING orders at La Parrilla, then one at Sushi Zen. Mateo stays without an order.
@@ -440,7 +440,7 @@ if ! jq -e --argjson restaurant "$parrilla_id" --argjson first "$order_id" '
   echo "$pending_page" >&2
   exit 1
 fi
-call GET "$plaza_url/orders?status=PENDING" "$camila_token" "" 403 > /dev/null
+call GET "$plaza_url/orders?status=PENDING" "$ronald_token" "" 403 > /dev/null
 call GET "$plaza_url/orders?status=PENDING" "$carlos_token" "" 403 > /dev/null
 call GET "$plaza_url/orders?status=PENDING" "$admin_token" "" 403 > /dev/null
 call GET "$plaza_url/orders?status=PENDIENTE" "$pedro_token" "" 400 > /dev/null
@@ -451,7 +451,7 @@ echo "Assign order (HU 13)"
 assigned="$(call POST "$plaza_url/orders/$order_id/assignment" "$pedro_token" "" 200)"
 if [[ $(jq -r .status <<< "$assigned") != IN_PREPARATION \
     || $(jq -r .id <<< "$assigned") != "$order_id" \
-    || $(jq -r .customerId <<< "$assigned") != "$camila_id" \
+    || $(jq -r .customerId <<< "$assigned") != "$ronald_id" \
     || $(jq -r .restaurantId <<< "$assigned") != "$parrilla_id" \
     || $(jq -r .assignedEmployeeId <<< "$assigned") != "$pedro_id" \
     || $(jq -r 'has("pinHash")' <<< "$assigned") != false \
@@ -460,7 +460,7 @@ if [[ $(jq -r .status <<< "$assigned") != IN_PREPARATION \
     || $(jq -r '.lines[0].quantity' <<< "$assigned") != 1 \
     || $(jq -r '.lines[1].dishId' <<< "$assigned") != "$limonada_id" \
     || $(jq -r '.lines[1].quantity' <<< "$assigned") != 2 ]]; then
-  echo "POST /orders/{id}/assignment did not move Camila's order to IN_PREPARATION." >&2
+  echo "POST /orders/{id}/assignment did not move Ronald's order to IN_PREPARATION." >&2
   echo "$assigned" >&2
   exit 1
 fi
@@ -480,7 +480,7 @@ if ! jq -e --argjson restaurant "$parrilla_id" --argjson taken "$order_id" '
   || ! jq -e --argjson taken "$order_id" --argjson employee "$pedro_id" '
     .totalItems == 1 and .items[0].id == $taken and .items[0].assignedEmployeeId == $employee
   ' <<< "$sofia_preparing" > /dev/null; then
-  echo "The queues did not reflect Camila's assignment." >&2
+  echo "The queues did not reflect Ronald's assignment." >&2
   echo "$pending_after" >&2
   echo "$preparing_after" >&2
   exit 1
@@ -489,13 +489,60 @@ call POST "$plaza_url/orders/$order_id/assignment" "$sofia_token" "" 409 > /dev/
 call POST "$plaza_url/orders/$order_id/assignment" "$pedro_token" "" 409 > /dev/null
 call POST "$plaza_url/orders/$order_id/assignment" "$kenji_token" "" 404 > /dev/null
 call POST "$plaza_url/orders/$order_id/assignment" "$valentina_token" "" 404 > /dev/null
-call POST "$plaza_url/orders/$order_id/assignment" "$camila_token" "" 403 > /dev/null
+call POST "$plaza_url/orders/$order_id/assignment" "$ronald_token" "" 403 > /dev/null
 call POST "$plaza_url/orders/$order_id/assignment" "$carlos_token" "" 403 > /dev/null
 call POST "$plaza_url/orders/$order_id/assignment" "$admin_token" "" 403 > /dev/null
 call POST "$plaza_url/orders/0/assignment" "$pedro_token" "" 400 > /dev/null
 call POST "$plaza_url/orders/abc/assignment" "$pedro_token" "" 400 > /dev/null
-call POST "$plaza_url/orders" "$camila_token" "$order_body" 409 > /dev/null
-echo "Pedro took Camila's order. It is IN_PREPARATION. La Parrilla has 11 PENDING orders left."
+call POST "$plaza_url/orders" "$ronald_token" "$order_body" 409 > /dev/null
+echo "Pedro took Ronald's order. It is IN_PREPARATION. La Parrilla has 11 PENDING orders left."
+
+echo "Mark order ready (HU 14)"
+ready="$(call POST "$plaza_url/orders/$order_id/ready" "$pedro_token" "" 200)"
+if [[ $(jq -r .status <<< "$ready") != READY \
+    || $(jq -r .id <<< "$ready") != "$order_id" \
+    || $(jq -r .customerId <<< "$ready") != "$ronald_id" \
+    || $(jq -r .restaurantId <<< "$ready") != "$parrilla_id" \
+    || $(jq -r .assignedEmployeeId <<< "$ready") != "$pedro_id" \
+    || $(jq -r 'has("pin")' <<< "$ready") != false \
+    || $(jq -r 'has("pinHash")' <<< "$ready") != false \
+    || $(jq -r '.lines | length' <<< "$ready") != 2 \
+    || $(jq -r '.lines[0].dishId' <<< "$ready") != "$churrasco_id" \
+    || $(jq -r '.lines[0].quantity' <<< "$ready") != 1 \
+    || $(jq -r '.lines[1].dishId' <<< "$ready") != "$limonada_id" \
+    || $(jq -r '.lines[1].quantity' <<< "$ready") != 2 ]]; then
+  echo "POST /orders/{id}/ready did not move Ronald's order to READY." >&2
+  echo "$ready" >&2
+  exit 1
+fi
+ready_page="$(call GET "$plaza_url/orders?status=READY" "$pedro_token" "" 200)"
+preparing_done="$(call GET "$plaza_url/orders?status=IN_PREPARATION" "$pedro_token" "" 200)"
+pending_left="$(call GET "$plaza_url/orders?status=PENDING&page=0&size=10" "$pedro_token" "" 200)"
+if ! jq -e --argjson restaurant "$parrilla_id" --argjson taken "$order_id" --argjson employee "$pedro_id" '
+    .totalItems == 1 and (.items | length) == 1
+    and .items[0].id == $taken and .items[0].status == "READY"
+    and .items[0].assignedEmployeeId == $employee and .items[0].restaurantId == $restaurant
+    and (.items[0] | has("pinHash") | not) and (.items[0] | has("pin") | not)
+  ' <<< "$ready_page" > /dev/null \
+  || ! jq -e '.totalItems == 0 and .totalPages == 0 and (.items | length) == 0' <<< "$preparing_done" > /dev/null \
+  || ! jq -e --argjson restaurant "$parrilla_id" --argjson taken "$order_id" '
+    .totalItems == 11 and .totalPages == 2
+    and all(.items[]; .status == "PENDING" and .restaurantId == $restaurant and .id != $taken)
+  ' <<< "$pending_left" > /dev/null; then
+  echo "The queues did not reflect Ronald's ready order." >&2
+  echo "$ready_page" >&2
+  echo "$preparing_done" >&2
+  echo "$pending_left" >&2
+  exit 1
+fi
+call POST "$plaza_url/orders/$order_id/ready" "$sofia_token" "" 409 > /dev/null
+call POST "$plaza_url/orders/$order_id/ready" "$pedro_token" "" 409 > /dev/null
+call POST "$plaza_url/orders/$order_id/ready" "$kenji_token" "" 404 > /dev/null
+call POST "$plaza_url/orders/$order_id/ready" "$ronald_token" "" 403 > /dev/null
+call POST "$plaza_url/orders/$order_id/ready" "$carlos_token" "" 403 > /dev/null
+call POST "$plaza_url/orders/$order_id/ready" "$admin_token" "" 403 > /dev/null
+call POST "$plaza_url/orders" "$ronald_token" "$order_body" 409 > /dev/null
+echo "Pedro marked Ronald's order READY. The PIN was sent by SMS and is not in the response."
 
 echo
 echo "Seed loaded. Every seeded account uses the password: $seed_password"
@@ -509,7 +556,7 @@ printf '%-28s %-14s %4s  %s\n' \
   sofia.herrera@example.com EMPLOYEE "$sofia_id" "$parrilla_id" \
   kenji.morales@example.com EMPLOYEE "$kenji_id" "$sushi_id" \
   valentina.rossi@example.com EMPLOYEE "$valentina_id" "$napoli_id" \
-  camila.restrepo@example.com CUSTOMER "$camila_id" - \
+  ronald.martinez@example.com CUSTOMER "$ronald_id" - \
   mateo.vargas@example.com CUSTOMER "$mateo_id" - \
   mariana.ortiz@example.com OWNER "$mariana_id" "20 restaurants; menu on $cafe_id"
 echo
@@ -519,4 +566,4 @@ echo "Empty menu: $zumos_id Zumos Tropicales. Paged menu: $cafe_id Café Andino,
 echo "Dishes of La Parrilla de Carlos: $churrasco_id $costillas_id $ensalada_id $limonada_id"
 echo "Dishes of Sushi Zen 88: $california_id $nigiri_id $te_id"
 echo "Dishes of Pizzería Bella Napoli: $margarita_id $pepperoni_id $lasana_id $tiramisu_id"
-echo "Orders: Camila $order_id is IN_PREPARATION with Pedro $pedro_id. La Parrilla has 11 PENDING left. Sushi Zen has 1 PENDING. Mateo has no order."
+echo "Orders: Ronald $order_id is READY with Pedro $pedro_id. La Parrilla has 11 PENDING left. Sushi Zen has 1 PENDING. Mateo has no order."
