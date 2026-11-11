@@ -57,12 +57,15 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_TTL: ${JWT_TTL:-PT8H}
       USER_SERVICE_URL: http://user-service:8081
+      PLAZA_SERVICE_URL: http://plaza-service:8082
     ports:
       - "8083:8083"
     depends_on:
       postgres:
         condition: service_healthy
       user-service:
+        condition: service_started
+      plaza-service:
         condition: service_started
 
   messaging-service:

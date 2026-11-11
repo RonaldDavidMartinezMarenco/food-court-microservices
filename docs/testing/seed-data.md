@@ -2,7 +2,7 @@
 
 `scripts/seed.sh` loads a known set of accounts, restaurants, and dishes through the public API. Each row goes through the same validation, bcrypt hashing, and ownership checks as a manual call, so the seed only contains data the services accept.
 
-The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), HU 9 (the restaurant list), HU 10 (the menu of a restaurant), HU 11 (placing an order), HU 12 (the employee order list), HU 13 (an employee assigns a pending order), HU 14 (that employee marks it ready and the customer receives the PIN by SMS), HU 15 (that employee delivers it with the PIN), HU 16 (a customer cancels a pending order), and HU 17 (the customer reads the status history of that order). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. La Parrilla de Carlos places twelve `PENDING` orders, then Pedro assigns Ronald's and leaves it in `IN_PREPARATION`. The script does not mark that order ready or delivered. Lucía cancels hers and places another, so the restaurant ends with one `IN_PREPARATION`, one `CANCELLED`, and eleven `PENDING`. Sushi Zen 88 has one `PENDING` order. Mateo has none, so a manual call can place his. Each status change the script performs is stored by traceability-service.
+The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), HU 9 (the restaurant list), HU 10 (the menu of a restaurant), HU 11 (placing an order), HU 12 (the employee order list), HU 13 (an employee assigns a pending order), HU 14 (that employee marks it ready and the customer receives the PIN by SMS), HU 15 (that employee delivers it with the PIN), HU 16 (a customer cancels a pending order), and HU 17 (the customer reads the status history of that order). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. La Parrilla de Carlos places twelve `PENDING` orders, then Pedro assigns Ronald's and leaves it in `IN_PREPARATION`. The script does not mark that order ready or delivered. Lucía cancels hers and places another, so the restaurant ends with one `IN_PREPARATION`, one `CANCELLED`, and eleven `PENDING`. Sushi Zen 88 has one `PENDING` order. Mateo has none, so a manual call can place his. Each status change the script performs is stored by traceability-service. HU 18 reads that history for the owner. The script leaves no order `DELIVERED`, so the efficiency call is empty until the manual delivery below.
 
 ## Contents
 
@@ -624,4 +624,24 @@ Plaza writes one row on each status change. After the seed, Ronald's order has `
 | Employee, owner, or administrator | Pedro, Carlos, or the administrator | 403 |
 | No token | no `Authorization` header | 401 |
 | Id zero | Ronald, `GET http://localhost:8083/orders/0/trace` | 400 |
+
+### Order efficiency (HU 18), `GET /restaurants/{restaurantId}/efficiency`
+
+This call belongs to traceability-service, on port 8083. Only the owner of that restaurant can call it. A finished order starts when its trace reaches `IN_PREPARATION` and ends when it reaches `DELIVERED`. The duration is whole seconds between those two times. `PENDING`, `CANCELLED`, `IN_PREPARATION`, and `READY` do not appear. The employee ranking and `averageDurationSeconds` use every finished order of the restaurant. `slowerThanAverage` is true only when that order took strictly longer than the restaurant average. Rank 1 is the lowest average. An equal average is ordered by the smaller `employeeId`.
+
+After the seed, La Parrilla de Carlos has no delivered order. Carlos receives 200 with `completedOrders` 0, `averageDurationSeconds` null, an empty page, and an empty ranking.
+
+To see a duration, Pedro marks order 1 ready and then delivers it with `SEED_PIN`. Carlos then reads restaurant 1. That single order has `employeeId` 5, `slowerThanAverage` false, and Pedro at rank 1. The seconds depend on the clock between the two calls. Laura, who does not own restaurant 1, receives 403.
+
+| Case | Caller and path | Expected |
+| --- | --- | --- |
+| No finished order | Carlos, `GET http://localhost:8083/restaurants/1/efficiency` | 200, `completedOrders` 0, `averageDurationSeconds` null, empty `orders.items`, empty `employeeRanking` |
+| After Pedro delivers order 1 | Carlos, same path | 200, `completedOrders` 1, `orders.items[0].orderId` 1, `employeeId` 5, `slowerThanAverage` false, ranking rank 1 for employee 5 |
+| Another owner | Laura, `GET http://localhost:8083/restaurants/1/efficiency` | 403 "You do not have permission for this action" |
+| Unknown restaurant | Carlos, `GET http://localhost:8083/restaurants/999/efficiency` | 404 "No restaurant exists for this id" |
+| Employee, customer, or administrator | Pedro, Ronald, or the administrator | 403 |
+| No token | no `Authorization` header | 401 |
+| Page or size out of range | Carlos, `page=-1`, `size=0`, or `size=51` | 400 |
+| Id zero | Carlos, `GET http://localhost:8083/restaurants/0/efficiency` | 400 |
+
 

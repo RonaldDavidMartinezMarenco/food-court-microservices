@@ -222,10 +222,13 @@ CREATE INDEX order_status_change_customer_idx
 CREATE INDEX order_status_change_employee_idx
     ON order_status_change (employee_id, occurred_at)
     WHERE employee_id IS NOT NULL;
+
+CREATE INDEX order_status_change_restaurant_status_idx
+    ON order_status_change (restaurant_id, new_status, order_id);
 ```
 
 `order_id` points at `customer_order.id`. `customer_id` and `employee_id` point at `app_user.id`. `restaurant_id` points at `restaurant.id`.
 
 The first row of an order has `new_status = 'PENDING'` and `previous_status` null. Time spent in a status is the gap between that row's `occurred_at` and the next one.
 
-For HU 18, an order starts when `new_status` becomes `IN_PREPARATION` and finishes when it becomes `DELIVERED`. That interval belongs to `employee_id`. A `CANCELLED` order has no finish and is left out of the average. The owner filter is `restaurant_id`.
+For HU 18, an order starts when `new_status` becomes `IN_PREPARATION` and finishes when it becomes `DELIVERED`. That interval belongs to `employee_id`. A `CANCELLED` order has no finish and is left out of the average. The owner filter is `restaurant_id`. The read uses `order_status_change_restaurant_status_idx` on `(restaurant_id, new_status, order_id)`.
