@@ -33,16 +33,6 @@ if [[ -z $admin_email || -z $admin_password ]]; then
   exit 1
 fi
 
-seed_pin="${SEED_PIN:-$(env_value SEED_PIN)}"
-if [[ ! $seed_pin =~ ^[0-9]{6}$ ]]; then
-  echo "Set SEED_PIN to 6 digits in the environment or in .env, and start plaza-service with APP_PIN_FIXED set to the same value." >&2
-  exit 1
-fi
-wrong_pin=000000
-if [[ $seed_pin == 000000 ]]; then
-  wrong_pin=111111
-fi
-
 for tool in curl jq; do
   command -v "$tool" > /dev/null || { echo "$tool is required." >&2; exit 1; }
 done

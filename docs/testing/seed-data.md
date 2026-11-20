@@ -2,7 +2,7 @@
 
 `scripts/seed.sh` loads a known set of accounts, restaurants, and dishes through the public API. Each row goes through the same validation, bcrypt hashing, and ownership checks as a manual call, so the seed only contains data the services accept.
 
-The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants), HU 3 and HU 4 (dishes), HU 5 (login), HU 6 (employees), HU 8 (customers), HU 9 (the restaurant list), HU 10 (the menu of a restaurant), HU 11 (placing an order), HU 12 (the employee order list), HU 13 (an employee assigns a pending order), HU 14 (that employee marks it ready and the customer receives the PIN by SMS), HU 15 (that employee delivers it with the PIN), HU 16 (a customer cancels a pending order), and HU 17 (the customer reads the status history of that order). The manual cases also cover HU 7 (enable or disable a dish); the script itself leaves every dish active. La Parrilla de Carlos places twelve `PENDING` orders, then Pedro assigns Ronald's and leaves it in `IN_PREPARATION`. The script does not mark that order ready or delivered. Lucía cancels hers and places another, so the restaurant ends with one `IN_PREPARATION`, one `CANCELLED`, and eleven `PENDING`. Sushi Zen 88 has one `PENDING` order. Mateo has none, so a manual call can place his. Each status change the script performs is stored by traceability-service. HU 18 reads that history for the owner. The script leaves no order `DELIVERED`, so the efficiency call is empty until the manual delivery below.
+The script creates the accounts and menus, places demo orders, assigns Ronald's order to Pedro, cancels Lucía's first order, and checks the trace. At the end, La Parrilla has one order `IN_PREPARATION`, one `CANCELLED`, and eleven `PENDING`. Sushi Zen 88 has one `PENDING`. Mateo has none. Every dish stays active and no order reaches `READY` or `DELIVERED` during the seed. Use the manual cases or the [user manual](../user-manual/manual-de-usuario.pdf) to try dish activation, the ready notification, delivery, and the efficiency report.
 
 ## Contents
 
@@ -18,24 +18,15 @@ The seed covers the stories implemented so far: HU 1 (owners), HU 2 (restaurants
 
 The administrator is not part of the seed. `user-service` creates it on startup from the `BOOTSTRAP_ADMIN_*` values in `.env`, and the script logs in with those values.
 
-Full stack in Compose:
+For a new Compose environment, copy `.env.example` to `.env`, then start the stack. Set `MESSAGING_PROVIDER=local` and `SEED_PIN=482913` when you plan to complete the manual delivery without a real SMS:
 
 ```bash
-docker compose down -v                          # deletes the Postgres volume
-docker compose --env-file .env up -d --build
-bash scripts/seed.sh
+docker compose up -d --build
 ```
 
-Postgres in Compose and the services from Maven:
+Verify that `/v3/api-docs` responds on ports 8081 through 8084. Then run `bash scripts/seed.sh` with `curl` and `jq` installed. The seed also runs with `SEED_PIN` empty or unset.
 
-```bash
-docker compose --env-file .env -f compose.postgres.yml down -v
-docker compose --env-file .env -f compose.postgres.yml up -d --wait
-# start user-service, plaza-service, and traceability-service with ./mvnw spring-boot:run
-bash scripts/seed.sh
-```
-
-The script waits up to two minutes for both services, needs `curl` and `jq`, and stops at the first unexpected HTTP status with the response body. When `carlos.ramirez@example.com` can already log in, it reports that the seed is loaded and changes nothing.
+The script stops at the first unexpected HTTP status and prints the response body. When `carlos.ramirez@example.com` can already log in, it reports that the seed is loaded. A partial load can therefore require a fresh test instance. To get a new volume, stop the current Compose stack and start with an unused project name.
 
 | Variable | Default |
 | --- | --- |
@@ -43,10 +34,9 @@ The script waits up to two minutes for both services, needs `curl` and `jq`, and
 | `PLAZA_URL` | `http://localhost:8082` |
 | `TRACEABILITY_URL` | `http://localhost:8083` |
 | `SEED_PASSWORD` | `Password123` |
-| `SEED_PIN` | none; required, six digits, same value as `APP_PIN_FIXED` on plaza-service |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` from `.env` |
 
-`SEED_PIN` is the PIN of every order the running plaza-service marks ready. Compose passes it as `APP_PIN_FIXED`. Leave that variable empty and plaza keeps a random PIN; the script then stops before creating data, because it cannot read the PIN back from the API. Set it in `.env`, recreate plaza-service, and run the script. The SMS uses the same digits. The value is not a default in this document.
+The script leaves Ronald’s order in `IN_PREPARATION`. The PIN is generated later when an employee marks it ready. For a fixed PIN, specify six digits in `SEED_PIN`. Compose passes the value to plaza-service as `APP_PIN_FIXED`. When launching Java directly, export `SEED_PIN` or set `APP_PIN_FIXED` to override it. An empty setting selects random PIN generation.
 
 The ids below are the ones an empty database assigns. The script prints the ids it received at the end.
 
@@ -500,7 +490,7 @@ Example response, Ronald's order after Pedro takes it:
 
 An employee calls it. There is no body. The employee must be the one assigned to the order, and the order must be `IN_PREPARATION`. The response is the same order with `status` `READY`. `pin` and `pinHash` are absent. The PIN goes out by SMS to the customer's phone. A second call is 409 and does not send another PIN. If the SMS is rejected, the order stays `IN_PREPARATION`.
 
-The SMS goes out through textbee and the registered Android phone. The body is `Tu pedido #{id} de {restaurant} está listo.` and, on the next line, `Pin de seguridad: {pin}`. It arrives on an iPhone or an Android because it is a carrier SMS. The phone needs internet. It does not need to share a Wi-Fi network with these services. Without `TEXTBEE_API_KEY`, or if the phone is offline, the call returns 502 and the order stays `IN_PREPARATION`. `MESSAGING_PROVIDER=twilio` keeps the Twilio adapter available. A Twilio trial account still rejects this custom body.
+Use `MESSAGING_PROVIDER=local` for this seeded example. The request is accepted without delivering an SMS, and the evaluator can use `SEED_PIN`. For a live test, configure textbee and use a new customer with an authorized test phone. The default provider is textbee. An explicit rejection from the SMS provider can produce 502. Plaza attempts to restore `IN_PREPARATION` if the notification fails, so check the current status before retrying.
 
 After the seed, order 1 is still `IN_PREPARATION` and assigned to Pedro, so the success call below is the one the running database accepts.
 
@@ -550,10 +540,10 @@ The script does not deliver order 1. After the seed that order is `IN_PREPARATIO
 | No token | no `Authorization` header | 401 |
 | Assignment after delivery | Pedro, `POST /orders/1/assignment` | 409 "The order is DELIVERED and cannot be assigned" |
 | Ready after delivery | Pedro, `POST /orders/1/ready` | 409 "The order is DELIVERED and cannot be marked ready" |
-| Customer can order again | Ronald, `POST /orders` with his original body, after delivery and before order 14 exists | 201, `status` `PENDING` |
-| Customer blocked again | Ronald, same body after order 14 exists | 409 "The customer already has an order in progress" |
+| Customer can order again | Ronald, `POST /orders` with his original body, after delivery, before opening another active order for Ronald | 201, `status` `PENDING` |
+| Customer blocked again | Ronald, same body after Ronald opens another active order | 409 "The customer already has an order in progress" |
 
-Example request. `482913` is illustrative. The seed uses `SEED_PIN`, not this value.
+Example request. Use `482913` if you configured it as the fixed PIN. With a random PIN, use the value received in the SMS.
 
 ```json
 {
@@ -581,7 +571,7 @@ Example response, Ronald's order after Pedro delivers it:
 
 A customer calls it. There is no body. The customer id comes from the token. The order must belong to that customer and be `PENDING`. The response is the same order with `status` `CANCELLED`. Lines stay. `assignedEmployeeId` stays null on a pending order. `pin` and `pinHash` are absent. A second call is 409. The detail is exactly `Lo sentimos, tu pedido ya está en preparación y no puede cancelarse` for every status other than `PENDING`, including `IN_PREPARATION`, `READY`, `DELIVERED`, and `CANCELLED`.
 
-After the seed, order 2 is already `CANCELLED` and Lucía's new order is 15, so her call on order 2 is the 409 and another `POST /orders` from her is 409 again. Run the success call before the script's own cancellation, while order 2 is still `PENDING`.
+After the seed, order 2 is already `CANCELLED` and Lucía's new order is 14, so her call on order 2 is the 409 and another `POST /orders` from her is 409 again. Run the success call before the script's own cancellation, while order 2 is still `PENDING`.
 
 | Case | Caller and path | Expected |
 | --- | --- | --- |
@@ -593,8 +583,8 @@ After the seed, order 2 is already `CANCELLED` and Lucía's new order is 15, so 
 | Id zero or text | Lucía, `/orders/0/cancellation` or `/orders/abc/cancellation` | 400 |
 | Employee, owner, or administrator | Pedro, Sofía, Carlos, or the administrator | 403 |
 | No token | no `Authorization` header | 401 |
-| Customer can order again | Lucía, `POST /orders` with restaurant 1 and Churrasco quantity 2, after cancellation and before order 15 exists | 201, `status` `PENDING` |
-| Customer blocked again | Lucía, same body after order 15 exists | 409 "The customer already has an order in progress" |
+| Customer can order again | Lucía, `POST /orders` with restaurant 1 and Churrasco quantity 2, after cancellation and before order 14 exists | 201, `status` `PENDING` |
+| Customer blocked again | Lucía, same body after order 14 exists | 409 "The customer already has an order in progress" |
 
 Example response, Lucía's order after she cancels it:
 
@@ -631,7 +621,7 @@ This call belongs to traceability-service, on port 8083. Only the owner of that 
 
 After the seed, La Parrilla de Carlos has no delivered order. Carlos receives 200 with `completedOrders` 0, `averageDurationSeconds` null, an empty page, and an empty ranking.
 
-To see a duration, Pedro marks order 1 ready and then delivers it with `SEED_PIN`. Carlos then reads restaurant 1. That single order has `employeeId` 5, `slowerThanAverage` false, and Pedro at rank 1. The seconds depend on the clock between the two calls. Laura, who does not own restaurant 1, receives 403.
+To see a duration, Pedro marks order 1 ready and then delivers it with `SEED_PIN`. Carlos then reads restaurant 1. That single order has `employeeId` 5, `slowerThanAverage` false, and Pedro at rank 1. The seconds measure the interval from assignment to delivery. Laura, who does not own restaurant 1, receives 403.
 
 | Case | Caller and path | Expected |
 | --- | --- | --- |

@@ -37,7 +37,7 @@ El brief exige esto:
 - Cada historia de usuario va en su propia rama y lleva pruebas unitarias.
 - Se trabaja una historia a la vez.
 - La base relacional puede ser MySQL o PostgreSQL. En este proyecto la base es PostgreSQL.
-- El PIN se envía por SMS con Twilio, desde `messaging-service`.
+- `messaging-service` solicita a textbee el envío del PIN por SMS. Para la demostración se puede usar el proveedor local.
 - PostgreSQL guarda usuarios, la plazoleta y la trazabilidad. MongoDB y DynamoDB no entran en esta versión.
 
 El arquetipo es Spring Boot 4.1.1, Java 21 y Maven, con el árbol hexagonal vacío (`domain`, `application`, `infrastructure`). H2 se reemplaza por PostgreSQL. El detalle y las 18 historias están en `.cursor/plans/food-court-architecture-setup.md`.
@@ -51,7 +51,7 @@ El repositorio maestro es `food-court-microservices`. Los cuatro servicios viven
 | Usuarios | `user-service` | Cuentas, roles y login. |
 | Plazoleta | `plaza-service` | Restaurantes, platos y pedidos. |
 | Trazabilidad | `traceability-service` | Historial de estados y eficiencia. |
-| Mensajería | `messaging-service` | SMS del PIN con Twilio. |
+| Mensajería | `messaging-service` | SMS del PIN con textbee y simulación local. |
 
 Las historias están en [Cronograma reto plazoleta.xlsx](Cronograma%20reto%20plazoleta.xlsx), hoja `BACKLOG`, semanas 1 a 3, de la HU 1 a la HU 18.
 
