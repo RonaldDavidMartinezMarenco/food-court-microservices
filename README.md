@@ -8,7 +8,7 @@
 
 Backend for a food court. A customer orders dishes from one restaurant. An administrator creates restaurants and owner accounts. An owner manages that restaurant's menu and employees. An employee prepares the order and delivers it with a security PIN.
 
-This repository is the master checkout. It holds the docs, Compose files, and the script that clones the services. Each service is a separate Git repository. Cloning this repo does not download them.
+This repository is the master checkout. It holds the docs, Compose files, and the script that clones the services. Each service is a separate Git repository. Cloning this repo does not download them. The release ZIP includes all four service directories.
 
 ## Contents
 
@@ -17,6 +17,7 @@ This repository is the master checkout. It holds the docs, Compose files, and th
 - [Quick start](#quick-start)
 - [Run the services](#run-the-services)
 - [Seed data](#seed-data)
+- [Delivery package](#delivery-package)
 - [Layout](#layout)
 
 ## Repositories
@@ -26,7 +27,7 @@ This repository is the master checkout. It holds the docs, Compose files, and th
 | Accounts, roles, and login | [user-service](https://github.com/RonaldDavidMartinezMarenco/user-service) | 8081 | `user_db` |
 | Restaurants, dishes, and orders | [plaza-service](https://github.com/RonaldDavidMartinezMarenco/plaza-service) | 8082 | `plaza_db` |
 | Status history and efficiency | [traceability-service](https://github.com/RonaldDavidMartinezMarenco/traceability-service) | 8083 | `traceability_db` |
-| Ready-order SMS through Twilio | [messaging-service](https://github.com/RonaldDavidMartinezMarenco/messaging-service) | 8084 | none |
+| Ready-order SMS through textbee, with a local demo mode | [messaging-service](https://github.com/RonaldDavidMartinezMarenco/messaging-service) | 8084 | none |
 
 `scripts/clone-services.sh` clones those four repositories into this directory. The master `.gitignore` excludes the folders, so their history stays in their own remotes.
 
@@ -50,7 +51,7 @@ cp .env.example .env
 docker compose --env-file .env -f compose.postgres.yml up -d --wait
 ```
 
-Postgres listens on host port `5433`. The container creates `user_db`. `postgres/init-databases.sql` creates `plaza_db` and `traceability_db` the first time the volume is empty.
+Postgres listens on host port `5433`. On a fresh volume, the container creates the configured `POSTGRES_DB` and runs `postgres/init-databases.sql` to ensure `user_db`, `plaza_db`, and `traceability_db` exist.
 
 If a service directory is already a Git checkout, the script leaves it in place.
 
@@ -73,11 +74,15 @@ docker compose --env-file .env up --build
 
 Inside Compose the database host is `postgres` and the port is `5432`. `docker compose down` keeps the volume. `docker compose down -v` deletes the data.
 
-Fill `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` in `.env` before sending the ready-order SMS. `.env` is not committed.
+For a local demo, set `MESSAGING_PROVIDER=local` and `SEED_PIN=482913` in `.env` before starting the stack. No SMS is delivered in this mode. For live SMS, set `MESSAGING_PROVIDER=textbee` and `TEXTBEE_API_KEY`. Set `TEXTBEE_DEVICE_ID` to select a registered Android device. An unsupported provider value stops messaging-service at startup. Keep `.env` private.
 
 ## Seed data
 
-With the services running on an empty database, `bash scripts/seed.sh` loads owners, restaurants, dishes, and employees through the API. The accounts, ids, and manual test cases are in [docs/testing/seed-data.md](docs/testing/seed-data.md).
+With the services running on fresh databases, `bash scripts/seed.sh` loads accounts, restaurants, dishes, orders, and status history through the API. Load the seed with either PIN setting. Plaza accepts exactly six digits for a fixed PIN and generates a random PIN when the setting is empty. Compose passes `SEED_PIN` as `APP_PIN_FIXED`. For a direct Java launch, export `SEED_PIN` or set `APP_PIN_FIXED` explicitly. The accounts, IDs, and manual test cases are in [docs/testing/seed-data.md](docs/testing/seed-data.md).
+
+## Delivery package
+
+From the extracted ZIP, start with the [user manual](docs/user-manual/manual-de-usuario.pdf). It covers the Docker setup, Swagger access, the procedures by role, and the evaluation workflow. The services already come with the ZIP. The [updated project template](docs/requirements/plantilla-del-proyecto.docx) records the team, scope, deliverables, and source revisions.
 
 ## Layout
 

@@ -42,7 +42,7 @@ Los propietarios de cada restaurante tendrán disponible una funcionalidad para 
 
 * En la bd relacional recomendamos MySQL o PgSQL.  
 * La bd no Relacional recomendamos mongoDB o dynamodb.  
-* El api de Twilio lo pueden remplazar por SNS o la api de WSP.  
+* Se permite sustituir el proveedor de mensajería. Esta versión realiza el envío mediante textbee.
 * Cada microservicio es un repositorio aparte.  
 * Seguir la guia de GIT del classroom para el desarrollo del reto.  
 * Cada microservicio lo pueden comenzar desde el arquetipo que les compartimos en el classroom.  
