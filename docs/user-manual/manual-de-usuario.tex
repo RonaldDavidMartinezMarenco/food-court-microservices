@@ -4,6 +4,7 @@
 \usepackage{lmodern}
 \usepackage{tgpagella,tgheros}
 \usepackage[margin=22mm,headheight=22pt,footskip=12mm]{geometry}
+\PassOptionsToPackage{obeyspaces,spaces}{url}
 \usepackage{microtype,graphicx,booktabs,tabularx,enumitem,listings,fancyhdr,titlesec,caption,xurl}
 \usepackage[hidelinks,bookmarksnumbered=true]{hyperref}
 \hypersetup{pdftitle={Food Court - Manual de usuario},pdfauthor={Ronald Martinez y Elias Fuentes},pdfsubject={Operación y evaluación de la API de la plazoleta de comidas},pdflang={es-CO}}
@@ -105,12 +106,12 @@ El manual toma como referencia el resumen público de ISO/IEC/IEEE 26514:2022 pa
 
 \clearpage
 \section{Requisitos previos e instalación}\label{sec:instalacion}
-Si el entorno ya está en marcha, abra Swagger en el navegador e identifíquese con la cuenta de la tarea. Si va a ejecutar el ZIP en su equipo, use Docker Compose. Consulte el glosario (sección \ref{sec:glosario}) si necesita identificar una herramienta o una sigla.
+Si el entorno ya está en marcha, abra Swagger en el navegador e inicie sesión con una cuenta del rol correspondiente. Para ejecutar el proyecto en su equipo, use Docker Compose. El glosario de la sección \ref{sec:glosario} reúne las herramientas y siglas del manual.
 
 \subsection{Preparar una demostración con Docker}
 \begin{enumerate}
 \item Extraiga el ZIP y abra Bash en la carpeta que contiene \code{compose.yml}. Necesita Docker en ejecución, Compose 2.20.0 o posterior y conexión para descargar las imágenes y dependencias de la primera compilación. Use Bash, \code{curl} y \code{jq} para la semilla y el recorrido por terminal. En Windows puede usar Docker Desktop con una terminal Bash que tenga esas herramientas.
-\item Compruebe que estén libres 5433 y 8081 a 8084. Si todavía no existe \code{.env}, cópielo de la configuración de ejemplo.
+\item Compruebe que estén libres el puerto 5433 y los puertos del 8081 al 8084. Si todavía no existe \code{.env}, cópielo de la configuración de ejemplo.
 \begin{lstlisting}
 test -f .env || cp .env.example .env
 \end{lstlisting}
@@ -124,14 +125,14 @@ SEED_PIN=482913
 docker compose up -d --build
 docker compose ps
 \end{lstlisting}
-\item Compruebe que los cuatro servicios publiquen OpenAPI. Si un puerto todavía falla, espere al arranque y repita la consulta. Si el fallo persiste, revise la sección \ref{sec:soporte}.
+\item Compruebe que los cuatro servicios publiquen OpenAPI. Si un servicio aún no responde, espere a que termine de arrancar y repita la consulta. Si el fallo persiste, revise la sección \ref{sec:soporte}.
 \begin{lstlisting}
 for port in 8081 8082 8083 8084; do
   curl -fsS "http://localhost:$port/v3/api-docs" -o /dev/null || break
   printf 'API disponible en %s\n' "$port"
 done
 \end{lstlisting}
-\item Sobre una instalación nueva, cargue la semilla una sola vez. Busque \code{Seed loaded.} al final y conserve los identificadores que imprime. El administrador sale de \code{.env} y se crea en el primer arranque.
+\item En una instalación nueva, cargue la semilla una sola vez. Busque \code{Seed loaded.} al final y guarde los identificadores que muestra el script. En el primer arranque, Usuarios crea la cuenta de administrador con los datos de \code{.env}.
 \begin{lstlisting}
 bash scripts/seed.sh
 \end{lstlisting}
@@ -153,7 +154,7 @@ Mensajería & \swagger{8084} & Sin base & Aviso de pedido listo. \\
 \end{tabularx}
 \end{minipage}
 
-Cada servicio publica su contrato en \code{/v3/api-docs}. Para identificar qué está ejecutando, el contrato muestra \code{info.version} y la versión editable del proyecto registra la revisión de código de cada servicio. La dirección de PostgreSQL desde el anfitrión es \code{127.0.0.1:5433}. Dentro de Compose los servicios conectan por \code{postgres:5432}.
+Cada servicio publica su contrato en \code{/v3/api-docs}. Consulte \code{info.version} para conocer la versión del contrato. La plantilla del proyecto indica la revisión del código de cada servicio. La dirección de PostgreSQL desde el anfitrión es \code{127.0.0.1:5433}. Dentro de Compose los servicios conectan por \code{postgres:5432}.
 
 Para detener el entorno, ejecute \code{docker compose down} desde la raíz. Compose conserva el volumen. Si requiere una demostración nueva, detenga la instancia anterior y arranque con otro nombre de proyecto, por ejemplo \code{docker compose -p foodcourt-prueba up -d --build}. Use un nombre que todavía no tenga un volumen asociado y vuelva a ejecutar la semilla.
 
@@ -175,14 +176,14 @@ Cliente \code{CUSTOMER} & Registra su propia cuenta, consulta restaurantes y pla
 \end{minipage}
 
 \subsection{Estados del pedido}
-La preparación sigue \code{PENDING} (pendiente), \code{IN_PREPARATION} (en preparación), \code{READY} (listo) y \code{DELIVERED} (entregado). El cliente puede pasar de \code{PENDING} a \code{CANCELLED} (cancelado). Entregado y cancelado son estados finales. Mientras un pedido esté pendiente, en preparación o listo, ese cliente no puede abrir otro.
+Un pedido comienza en \code{PENDING} (pendiente). Después pasa a \code{IN_PREPARATION} (en preparación), \code{READY} (listo) y \code{DELIVERED} (entregado). El cliente puede pasar de \code{PENDING} a \code{CANCELLED} (cancelado). Entregado y cancelado son estados finales. Mientras un pedido esté pendiente, en preparación o listo, ese cliente no puede abrir otro.
 
 \clearpage
 \section{Iniciar sesión y operar desde Swagger}\label{sec:sesion}
 \subsection{Obtener un token}
 \begin{enumerate}
-\item Abra \swagger{8081}. En el grupo de autenticación despliegue \call{POST}{/login}{8081} y pulse \textbf{Try it out}.
-\item Sustituya el cuerpo por el correo y contraseña de la cuenta. Este ejemplo usa el cliente Mateo de la semilla. Pulse \textbf{Execute}.
+\item Abra \swagger{8081}. En el grupo de autenticación, despliegue \call{POST}{/login}{8081} y pulse \textbf{Try it out}.
+\item Sustituya el cuerpo por el correo y la contraseña de la cuenta. El ejemplo usa la cuenta de Mateo, incluida en la semilla. Pulse \textbf{Execute}.
 \begin{lstlisting}
 {"email":"mateo.vargas@example.com","password":"Password123"}
 \end{lstlisting}
@@ -191,14 +192,14 @@ La preparación sigue \code{PENDING} (pendiente), \code{IN_PREPARATION} (en prep
 
 \illustration{0.94\linewidth}{swagger-login.png}{Operación de inicio de sesión en Swagger UI de Usuarios.}
 
-Para consultar la cuenta que inició sesión, use \call{GET}{/users/{id}}{8081} con su \code{userId}. La respuesta incluye \code{id}, \code{role} y \code{restaurantId} cuando corresponde. El administrador puede consultar otras cuentas. Si pierde la contraseña, comuníquese con el equipo responsable del entorno, ya que la API carece de un flujo de recuperación.
+Para consultar la cuenta que inició sesión, use \call{GET}{/users/{id}}{8081} con su \code{userId}. La respuesta incluye \code{id}, \code{role} y \code{restaurantId} cuando corresponde. El administrador puede consultar otras cuentas. Si pierde la contraseña, consulte al equipo responsable del entorno. La API no ofrece recuperación de contraseñas.
 
 \clearpage
 \subsection{Autorizar una llamada y cambiar de rol}
 \begin{enumerate}
-\item Abra Swagger del servicio que ofrece la operación. Pulse \textbf{Authorize} e ingrese solo el valor de \code{accessToken} en \code{bearerAuth}. Swagger agrega el prefijo \code{Bearer}. Pulse \textbf{Authorize} dentro de la ventana y luego \textbf{Close}.
-\item Abra la operación, pulse \textbf{Try it out}, ingrese los parámetros o el JSON y pulse \textbf{Execute}. Lea el código y el cuerpo en \textbf{Server response}. En los ejemplos, sustituya \code{{id}}, \code{{restaurantId}} o \code{{orderId}} por el valor real. En Swagger escriba el número en el campo de ruta.
-\item Para cambiar de rol, obtenga el token de la otra cuenta en \code{/login}. En cada Swagger donde vaya a continuar, abra \textbf{Authorize}, pulse \textbf{Logout} si hay un token cargado, y pegue el nuevo. Para dejar de usar una cuenta, retire su token de Swagger y de la terminal. Un JWT emitido conserva su vigencia hasta que expira.
+\item Abra Swagger en el puerto del servicio que ofrece la operación. Pulse \textbf{Authorize} e ingrese solo el valor de \code{accessToken} en \code{bearerAuth}. Swagger agrega el prefijo \code{Bearer}. Pulse \textbf{Authorize} dentro de la ventana y luego \textbf{Close}.
+\item Abra la operación, pulse \textbf{Try it out}, ingrese los parámetros o el JSON y pulse \textbf{Execute}. Lea el código y el cuerpo en \textbf{Server response}. En Swagger, escriba el identificador real en el campo de ruta correspondiente. Los ejemplos usan los nombres \code{id}, \code{restaurantId} y \code{orderId}.
+\item Para cambiar de rol, obtenga el token de la otra cuenta en \code{/login}. En cada servicio que vaya a usar, abra \textbf{Authorize}. Si ya hay un token cargado, pulse \textbf{Logout} y pegue el nuevo. Para dejar de usar una cuenta, retire su token de Swagger y de la terminal. Un JWT emitido conserva su vigencia hasta que expira.
 \end{enumerate}
 
 \illustration{0.78\linewidth}{swagger-authorize.png}{Cuadro de autorización Bearer de Swagger UI de Plazoleta.}
@@ -208,9 +209,9 @@ Si usa otro cliente HTTP, envíe \code{Authorization: Bearer <token>} y, cuando 
 \clearpage
 \section{Administrador}\label{sec:admin}
 \subsection{Registrar un propietario y su restaurante}
-Inicie sesión con la cuenta que figura en \code{BOOTSTRAP_ADMIN_EMAIL}. Con los valores del ejemplo es \code{admin@example.com}. Autorice el mismo token en Usuarios y en Plazoleta.
+Inicie sesión con la cuenta que figura en \code{BOOTSTRAP_ADMIN_EMAIL}. En la configuración de ejemplo, el correo es \code{admin@example.com}. Autorice el mismo token en Usuarios y en Plazoleta.
 
-\textbf{1. Crear la cuenta propietaria (HU 1).} Ejecute \call{POST}{/owners}{8081}. Use un correo y documento que no estén registrados. El propietario debe tener al menos 18 años. Escriba el documento y teléfono como texto numérico, con \code{+} opcional en el teléfono. Use una contraseña de 8 a 72 caracteres y una fecha \code{AAAA-MM-DD}.
+\textbf{1. Crear la cuenta propietaria (HU 1).} Ejecute \call{POST}{/owners}{8081}. Use un correo y un documento que no estén registrados. El propietario debe tener al menos 18 años. Escriba el documento y el teléfono como cadenas de dígitos. El teléfono admite el signo \code{+} al inicio. Use una contraseña de 8 a 72 caracteres y una fecha \code{AAAA-MM-DD}.
 \begin{lstlisting}
 {
   "firstName":"Nora", "lastName":"Rios",
@@ -237,10 +238,10 @@ Confirme \code{201}. Guarde el \code{id} del restaurante y verifique que \code{o
 
 \clearpage
 \section{Propietario}\label{sec:owner}
-Para trabajar sobre sus propios datos, inicie sesión con Nora y use el id de Cocina Norte. Para trabajar sobre la semilla puede iniciar sesión con \code{carlos.ramirez@example.com} y usar La Parrilla de Carlos (id 1 en la instalación de referencia). En los dos JSON, el valor \code{restaurantId: 1} señala La Parrilla. Reemplácelo por el id de Cocina Norte si eligió a Nora.
+Para trabajar con el restaurante que creó, inicie sesión con Nora y use el identificador de Cocina Norte. Si va a usar los datos de prueba, inicie sesión con \code{carlos.ramirez@example.com}. El valor \code{restaurantId: 1} de los dos ejemplos corresponde a La Parrilla de Carlos. Si usa la cuenta de Nora, reemplácelo por el identificador de Cocina Norte.
 
 \subsection{Registrar empleados (HU 6)}
-Ejecute \call{POST}{/employees}{8081}. Use \code{roleId: 3}, el id de un restaurante propio y datos de una cuenta nueva. El empleado queda vinculado al restaurante y con ese alcance puede iniciar sesión y gestionar pedidos.
+Ejecute \call{POST}{/employees}{8081}. Use \code{roleId: 3}, el id de un restaurante propio y datos de una cuenta nueva. El empleado queda vinculado al restaurante y, después de iniciar sesión, puede gestionar sus pedidos.
 \begin{lstlisting}
 {
   "firstName":"Elena", "lastName":"Rios",
@@ -249,7 +250,7 @@ Ejecute \call{POST}{/employees}{8081}. Use \code{roleId: 3}, el id de un restaur
   "roleId":3, "restaurantId":1
 }
 \end{lstlisting}
-Confirme \code{201}, rol \code{EMPLOYEE} y el restaurante en \code{restaurantId}. Si la API devuelve \code{403}, revise que su cuenta sea propietaria de ese local.
+Confirme que la API responde \code{201}, asigna el rol \code{EMPLOYEE} y devuelve el restaurante en \code{restaurantId}. Si la API devuelve \code{403}, revise que su cuenta sea propietaria de ese local.
 
 \subsection{Crear un plato (HU 3)}
 Ejecute \call{POST}{/dishes}{8082}. El precio es un entero positivo. Incluya la categoría, una descripción y una URL de imagen con \code{http} o \code{https}. Use una URL real si desea que un cliente externo pueda cargar la imagen.
@@ -271,14 +272,14 @@ Ejecute \call{PUT}{/dishes/{id}}{8082} con el id del plato propio. El cuerpo adm
 
 \clearpage
 \subsection{Desactivar o volver a ofrecer un plato (HU 7)}
-Ejecute \call{PUT}{/dishes/{id}/active}{8082} con uno de estos cuerpos, según la acción. Use el id del plato creado en la sección anterior. La respuesta \code{200} devuelve el valor de \code{active} aplicado.
+Ejecute \call{PUT}{/dishes/{id}/active}{8082} con uno de estos cuerpos, según la acción. Use el id del plato creado en la sección anterior. Confirme una respuesta \code{200} y compruebe el valor de \code{active}.
 \begin{lstlisting}
 {"active":false}
 \end{lstlisting}
 \begin{lstlisting}
 {"active":true}
 \end{lstlisting}
-Para comprobar el efecto, cambie al token de cliente y consulte \code{GET /restaurants/{restaurantId}/dishes}. Busque el plato por categoría o revise todas las páginas. Al desactivar el plato desaparece del menú activo y de su total. Al reactivarlo vuelve al menú. El sistema conserva el registro del plato.
+Para comprobar el efecto, cambie al token de cliente y consulte \code{GET /restaurants/{restaurantId}/dishes}. Busque el plato por categoría o revise todas las páginas. El plato desactivado queda fuera del menú activo y de su recuento. Vuelve al menú al reactivarlo. El sistema conserva el registro del plato.
 
 \illustration{0.89\linewidth}{swagger-dish-active.png}{La respuesta muestra el plato con el campo active en false.}
 
@@ -287,19 +288,19 @@ Para comprobar el efecto, cambie al token de cliente y consulte \code{GET /resta
 Inicie sesión como propietario y abra \swagger{8083}. Ejecute \call{GET}{/restaurants/{restaurantId}/efficiency}{8083} con su restaurante. Puede enviar \code{page=0} y \code{size=10}. La primera página es 0 y el tamaño permitido va de 1 a 50.
 
 \begin{itemize}
-\item \code{completedOrders} cuenta los pedidos con traza desde \code{IN_PREPARATION} hasta \code{DELIVERED}. \code{averageDurationSeconds} resume las duraciones de todos los pedidos terminados del restaurante.
+\item \code{completedOrders} cuenta los pedidos con traza desde \code{IN_PREPARATION} hasta \code{DELIVERED}. \code{averageDurationSeconds} indica la duración media de esos pedidos.
 \item \code{orders.items} muestra el id del pedido, el empleado, las dos marcas de tiempo y \code{durationSeconds}. Los más largos aparecen primero. El promedio se expresa en segundos enteros. \code{slowerThanAverage} señala una duración estrictamente superior al promedio calculado.
-\item \code{employeeRanking} resume todos los pedidos terminados, aunque cambie la página. El puesto 1 corresponde al menor promedio. Si los promedios empatan, primero aparece el id de empleado menor.
+\item \code{employeeRanking} resume todos los pedidos terminados, aunque cambie la página. El puesto 1 corresponde al menor promedio. Si los promedios empatan, primero aparece el empleado con el identificador más bajo.
 \end{itemize}
 
-Inmediatamente después de la semilla, el restaurante 1 devuelve \code{completedOrders: 0}, \code{averageDurationSeconds: null}, una página sin elementos y un ranking vacío. Complete la entrega del pedido de Ronald para obtener el primer pedido completado. El reporte debería indicar al empleado asignado y el tiempo real entre la asignación y la entrega, en segundos. Consulte el recorrido de la sección \ref{sec:demo}.
+Inmediatamente después de la semilla, el restaurante 1 devuelve \code{completedOrders: 0}, \code{averageDurationSeconds: null}, una página sin elementos y un ranking vacío. Complete la entrega del pedido de Ronald para obtener el primer pedido completado. El reporte muestra el empleado asignado y los segundos transcurridos entre la asignación y la entrega. Consulte el recorrido de la sección \ref{sec:demo}.
 
 \illustration{0.94\linewidth}{swagger-efficiency.png}{Reporte de La Parrilla de Carlos después de la entrega. Pedro es el empleado de id 5.}
 
 \clearpage
 \section{Cliente}\label{sec:cliente}
 \subsection{Crear una cuenta (HU 8)}
-En \swagger{8081}, ejecute \route{POST}{/customers}. El registro es público. Use \code{roleId: 4}, correo y documento nuevos, contraseña de 8 a 72 caracteres, documento de hasta 20 dígitos y teléfono de 7 a 13 caracteres. Para SMS real, use un teléfono autorizado con prefijo internacional y signo \code{+}.
+En \swagger{8081}, ejecute \route{POST}{/customers}. El registro es público. Use \code{roleId: 4}, un correo sin registrar y un documento nuevo de hasta 20 dígitos. Ingrese una contraseña de 8 a 72 caracteres y un teléfono de 7 a 13 caracteres. Para SMS real, use un teléfono autorizado con prefijo internacional y signo \code{+}.
 \begin{lstlisting}
 {
   "firstName":"Irene", "lastName":"Rios",
@@ -308,19 +309,19 @@ En \swagger{8081}, ejecute \route{POST}{/customers}. El registro es público. Us
   "roleId":4
 }
 \end{lstlisting}
-Confirme \code{201} y rol \code{CUSTOMER}. Inicie sesión con el nuevo correo. Si usó la semilla, también puede pedir con la cuenta de Mateo, que queda sin un pedido activo.
+Confirme \code{201} y el rol \code{CUSTOMER}. Inicie sesión con el nuevo correo. Si usó la semilla, también puede pedir con la cuenta de Mateo, que queda sin un pedido activo.
 
 \subsection{Buscar un restaurante y consultar su menú (HU 9 y 10)}
 \begin{enumerate}
 \item Autorice el token en \swagger{8082} y ejecute \route{GET}{/restaurants} con \code{page=0} y \code{size=10}. La lista se ordena por nombre e incluye id, nombre y URL del logo. Guarde el id del restaurante.
 \item Ejecute \route{GET}{/restaurants/{restaurantId}/dishes}. Use el id 1 para La Parrilla de la semilla. En \code{category}, escriba \code{Carnes} para filtrar o deje el campo vacío para ver todos los platos activos. Se ordenan por nombre y, en caso de empate, por id.
-\item Anote los id de \code{items}. Consulte \code{totalItems} y \code{totalPages}. Aumente \code{page} para avanzar y use un \code{size} de 1 a 50. Si la página está vacía, revise el filtro y la posición de la página.
+\item Anote los identificadores de los platos en \code{items}. Consulte \code{totalItems} y \code{totalPages}. Aumente \code{page} para avanzar y use un \code{size} de 1 a 50. Si la página está vacía, revise el filtro y la posición de la página.
 \end{enumerate}
 
 \illustration{0.83\linewidth}{swagger-menu.png}{Menú de Carnes con un plato por página y dos resultados en total.}
 
 \subsection{Realizar un pedido (HU 11)}\label{sec:pedir}
-Ejecute \call{POST}{/orders}{8082} con el token de Irene o Mateo. Este ejemplo elige el Churrasco de La Parrilla (plato 1 en la semilla). Use los id devueltos por el menú si cambió de instalación.
+Ejecute \call{POST}{/orders}{8082} con el token de Irene o Mateo. Este ejemplo elige el Churrasco de La Parrilla (plato 1 en la semilla). Si cambió de instalación, use los identificadores que devuelve el menú.
 \begin{lstlisting}
 {"restaurantId":1,"lines":[{"dishId":1,"quantity":2}]}
 \end{lstlisting}
@@ -328,7 +329,7 @@ El pedido admite de 1 a 20 líneas, cada una con un plato activo distinto del mi
 
 \clearpage
 \subsection{Cancelar un pedido pendiente (HU 16)}
-Con el mismo token que lo creó, ejecute \call{POST}{/orders/{orderId}/cancellation}{8082}. Ingrese el id y ejecute con el cuerpo vacío. Si el pedido seguía pendiente, recibe \code{200} con \code{status: CANCELLED} y podrá hacer otro. Si el pedido ya cambió de estado, recibe \code{409}. Un id inexistente o de otro cliente recibe \code{404}.
+Con el token del cliente que creó el pedido, ejecute \call{POST}{/orders/{orderId}/cancellation}{8082}. Ingrese el id y ejecute con el cuerpo vacío. Si el pedido sigue pendiente, la API devuelve \code{200} con \code{status: CANCELLED}. El cliente ya puede hacer otro pedido. Si el pedido ya cambió de estado, recibe \code{409}. La API devuelve \code{404} si el pedido no existe o pertenece a otro cliente.
 
 Para probar la cancelación, use el pedido nuevo de la sección \ref{sec:pedir} antes de que un empleado lo tome. Si cargó la semilla, el pedido 2 de Lucía ya está cancelado. Puede consultarlo con su token en trazabilidad para ver el resultado guardado.
 
@@ -340,7 +341,7 @@ La respuesta \code{200} contiene \code{orderId}, \code{customerId}, \code{restau
 null           -> PENDING
 PENDING        -> IN_PREPARATION
 \end{lstlisting}
-La API devuelve \code{404} si no hay un historial disponible para ese cliente e id. Por ejemplo, Mateo recibe \code{404} al intentar consultar el pedido de Ronald.
+La API devuelve \code{404} si el historial del pedido no existe o corresponde a otro cliente. Por ejemplo, Mateo recibe \code{404} al intentar consultar el pedido de Ronald.
 
 \illustration{0.89\linewidth}{swagger-trace.png}{Historial del pedido de Ronald después de la entrega.}
 
@@ -350,22 +351,22 @@ Cuando el empleado marque el pedido listo, el proveedor de SMS configurado recib
 \clearpage
 \section{Empleado}\label{sec:empleado}
 \subsection{Consultar la cola de pedidos (HU 12)}
-Inicie sesión con su cuenta de empleado y autorícela en \swagger{8082}. Para la semilla use \code{pedro.martinez@example.com}. Ejecute \call{GET}{/orders}{8082} con \code{status=PENDING}, \code{page=0} y \code{size=10}. El parámetro \code{status} es obligatorio y utiliza uno de los cinco códigos de la sección \ref{sec:roles}.
+Inicie sesión con su cuenta de empleado y cargue el token en \swagger{8082}. Para la demostración, use \code{pedro.martinez@example.com}. Ejecute \call{GET}{/orders}{8082} con \code{status=PENDING}, \code{page=0} y \code{size=10}. El parámetro \code{status} es obligatorio y utiliza uno de los cinco códigos de la sección \ref{sec:roles}.
 
 La lista se limita al restaurante registrado en su cuenta. Cada resultado muestra el id, el cliente, el restaurante, el estado, el empleado asignado y las líneas. Un pedido pendiente tiene \code{assignedEmployeeId: null}. También puede consultar otros estados del mismo restaurante. Ver el pedido de otro empleado en la cola no concede permiso para completarlo.
 
 \illustration{0.94\linewidth}{swagger-orders.png}{Cola de Pedro filtrada por pedidos en preparación. El pedido 1 ya tiene empleado asignado.}
 
 \subsection{Tomar un pedido pendiente (HU 13)}
-1. Elija un id de la cola \code{PENDING}. Si creó el pedido de Mateo o Irene y quiere completar el ciclo, conserve ese id y evite ejecutar su cancelación.
+1. Elija un pedido de la cola \code{PENDING} y anote su identificador. Si quiere completar un pedido de Mateo o Irene, déjelo pendiente hasta que un empleado lo tome.
 
 2. Ejecute \call{POST}{/orders/{orderId}/assignment}{8082} con ese id y cuerpo vacío. Verifique \code{200}, \code{status: IN_PREPARATION} y su id en \code{assignedEmployeeId}. Consulte de nuevo la cola para comprobar el cambio. Si otro empleado ya lo tomó, la llamada devuelve \code{409}. Si el pedido es de otro restaurante, devuelve \code{404}.
 
 \clearpage
-\subsection{Marcar listo y solicitar el aviso (HU 14)}\label{sec:listo}
+\subsection{Marcar un pedido como listo y solicitar el aviso (HU 14)}\label{sec:listo}
 Ejecute \call{POST}{/orders/{orderId}/ready}{8082} con cuerpo vacío. Use el token del empleado asignado y un pedido en \code{IN_PREPARATION}. Para el recorrido de la semilla, Pedro ya es el empleado asignado al pedido 1 de Ronald.
 
-La respuesta exitosa es \code{200} y \code{status: READY}. La API devuelve el pedido sin el PIN ni su hash. Plazoleta consulta el teléfono del cliente y pide a Mensajería que envíe el PIN. Con el proveedor \code{local} se acepta el envío de prueba sin entregar un SMS. Si recibe un error del proveedor o de trazabilidad, revise la cola antes de reintentar. Plazoleta intenta restaurar el estado anterior si falla el aviso o el registro de la traza.
+Si la operación se completa, la API devuelve \code{200} con \code{status: READY}. La API devuelve el pedido sin el PIN ni su hash. Plazoleta consulta el teléfono del cliente y pide a Mensajería que envíe el PIN. Con el proveedor \code{local} se acepta el envío de prueba sin entregar un SMS. Si recibe un error del proveedor o de trazabilidad, revise la cola antes de reintentar. Plazoleta intenta restaurar el estado anterior si falla el aviso o el registro de la traza.
 
 \illustration{0.86\linewidth}{swagger-ready.png}{Respuesta de Plazoleta después de marcar el pedido 1 como listo.}
 
@@ -380,7 +381,7 @@ Confirme \code{200} y \code{status: DELIVERED}. Si el PIN no coincide, la API de
 
 \clearpage
 \section{Recorrido reproducible de evaluación}\label{sec:demo}
-Ejecute este recorrido inmediatamente después de cargar la semilla con los valores de la sección \ref{sec:instalacion}. En una primera carga sobre bases limpias, el restaurante de La Parrilla y el pedido de Ronald tienen id 1 en sus respectivos listados. Si el identificador difiere, consulte la salida de la semilla y la cola de Pedro. Los pasos pueden ejecutarse en Swagger o por terminal según el anexo \ref{sec:terminal}.
+Ejecute este recorrido inmediatamente después de cargar la semilla con los valores de la sección \ref{sec:instalacion}. En una primera carga sobre bases vacías, La Parrilla y el pedido de Ronald tienen el identificador 1 en sus respectivas listas. Si el identificador difiere, consulte la salida de la semilla y la cola de Pedro. Los pasos pueden ejecutarse en Swagger o por terminal según el anexo \ref{sec:terminal}.
 
 \begin{minipage}{\linewidth}
 \captionof{table}{Cuentas para el recorrido}
@@ -399,18 +400,18 @@ Lucía & \code{lucia.navarro@example.com} & Cliente con un pedido cancelado y ot
 
 \begin{enumerate}
 \item Como Carlos, consulte \call{GET}{/restaurants/1/efficiency}{8083}. Compruebe \code{completedOrders: 0}.
-\item Como Pedro, consulte \call{GET}{/orders?status=IN_PREPARATION}{8082}. La cola contiene el pedido 1 asignado a Pedro. Con el mismo token ejecute \call{POST}{/orders/1/ready}{8082}. Debe quedar \code{READY}.
+\item Como Pedro, consulte \call{GET}{/orders?status=IN_PREPARATION}{8082}. La cola contiene el pedido 1 asignado a Pedro. Con el mismo token, ejecute \call{POST}{/orders/1/ready}{8082}. Debe quedar \code{READY}.
 \item Intente entregar con \code{"pin":"000000"}. Debe recibir \code{409}. Repita con \code{"pin":"482913"}. La respuesta correcta devuelve \code{DELIVERED}.
 \item Como Ronald, consulte \call{GET}{/orders/1/trace}{8083}. La secuencia esperada es \code{PENDING}, \code{IN_PREPARATION}, \code{READY} y \code{DELIVERED}. La última duración debe ser nula. Como Mateo, la misma consulta debe responder \code{404}.
-\item Cambie a Carlos y repita \code{/restaurants/1/efficiency}. Debe mostrar un pedido completado, con Pedro en el puesto 1. Con un solo pedido \code{slowerThanAverage} es \code{false}. Los segundos dependen del momento en que se cargó la semilla y se hizo la entrega.
-\item Para probar la rama de cancelación, como Mateo cree un pedido nuevo siguiendo la sección \ref{sec:pedir}. Cancélelo mientras siga pendiente y consulte su traza. Debe mostrar \code{PENDING} y \code{CANCELLED}.
+\item Vuelva a usar el token de Carlos y consulte \code{/restaurants/1/efficiency}. Debe mostrar un pedido completado, con Pedro en el puesto 1. Con un solo pedido, \code{slowerThanAverage} es \code{false}. Los segundos dependen del momento en que se cargó la semilla y se hizo la entrega.
+\item Para probar la cancelación, cree un pedido con la cuenta de Mateo según la sección \ref{sec:pedir}. Cancélelo mientras siga pendiente y consulte su traza. Debe mostrar \code{PENDING} y \code{CANCELLED}.
 \end{enumerate}
 
 La guía de datos \code{docs/testing/seed-data.md} lista las cuentas y platos restantes. Para repetir el recorrido desde el mismo estado inicial, use una instancia de pruebas nueva y vuelva a cargar la semilla.
 
 \clearpage
 \section{Mensajería y restricciones de operación}\label{sec:sms}
-El paso \code{/orders/{orderId}/ready} solicita automáticamente el aviso. Mensajería y Trazabilidad publican sus contratos en Swagger, pero el recorrido regular usa Plazoleta para cambiar estados. La llamada de integración que registra un estado y la que solicita un SMS se incluyen en el anexo para identificar sus respuestas durante el diagnóstico.
+Al marcar un pedido como listo con \code{/orders/{orderId}/ready}, Plazoleta solicita el aviso. El anexo \ref{sec:rutas} indica las rutas de Mensajería y Trazabilidad que puede consultar en Swagger para diagnosticar fallos.
 
 \begin{minipage}{\linewidth}
 \captionof{table}{Configuración del proveedor de SMS}
@@ -426,7 +427,7 @@ Proveedor & Configuración y resultado \\
 
 \code{MESSAGING_PROVIDER} se aplica en Mensajería. Sus valores admitidos son \code{local} y \code{textbee}. Un valor desconocido impide el inicio de ese servicio. \code{SEED_PIN} se aplica en Plazoleta, donde Compose lo pasa como \code{APP_PIN_FIXED}. Un valor de seis dígitos fija el PIN de los pedidos que se marquen listos. Si queda vacío, Plazoleta genera un PIN aleatorio para cada pedido.
 
-\code{scripts/seed.sh} funciona con \code{SEED_PIN} configurado o vacío. Deja el pedido de Ronald en \code{IN_PREPARATION}. Para completar la entrega con el proveedor local, inicie Plazoleta con un PIN fijo conocido. Una configuración de PIN fijo inválida impide que Plazoleta arranque. En Java puede exportar \code{SEED_PIN} o usar \code{APP_PIN_FIXED} para darle prioridad a un valor explícito.
+\code{scripts/seed.sh} funciona con \code{SEED_PIN} configurado o vacío. Deja el pedido de Ronald en \code{IN_PREPARATION}. Para completar la entrega con el proveedor local, inicie Plazoleta con un PIN fijo conocido. Una configuración de PIN fijo inválida impide que Plazoleta arranque. Si ejecuta Plazoleta directamente con Java, exporte \code{SEED_PIN}. Si también define \code{APP_PIN_FIXED}, este último tiene prioridad.
 
 Para probar un SMS real, seleccione \code{textbee} y configure sus credenciales en \code{.env}. Use \code{TEXTBEE_BASE_URL} para cambiar la URL predeterminada si corresponde. Para generar PIN aleatorios, deje \code{SEED_PIN} vacío. Si cambia el valor con el entorno en marcha, aplique el cambio con \code{docker compose up -d plaza-service}. Los pedidos que ya están listos conservan su PIN. Cree un cliente con un número propio autorizado, haga un pedido y siga el recorrido de empleado. Confirme que el mensaje llegó y use el PIN recibido.
 
@@ -475,7 +476,7 @@ Semilla interrumpida & Lea el primer error de la salida. Una carga parcial puede
 \clearpage
 \subsection{Recuperar un pedido después de un error}
 \begin{enumerate}
-\item Si \code{/ready} respondió \code{502}, revise los registros de Mensajería y la clave de textbee si aplica. Si obtiene \code{503}, compruebe que los servicios dependientes estén disponibles. Plazoleta intenta restaurar \code{IN_PREPARATION} cuando falla el aviso o el registro de la traza.
+\item Si \code{/ready} respondió \code{502}, revise los registros de Mensajería. Si usa textbee, compruebe su clave. Si obtiene \code{503}, compruebe que los servicios dependientes estén disponibles. Plazoleta intenta restaurar \code{IN_PREPARATION} cuando falla el aviso o el registro de la traza.
 \item Consulte la cola de Plazoleta con el token de empleado y el historial con el token de cliente. Si el pedido sigue en preparación, solucione el problema de integración y vuelva a marcarlo listo. Si ya aparece listo, confirme si se recibió el aviso antes de repetir acciones.
 \item Si \code{/delivery} devolvió \code{409} por PIN incorrecto, el pedido permanece listo. Confirme los seis dígitos con el cliente o use el PIN fijo de la demostración. Conserve los ceros iniciales al introducirlo.
 \end{enumerate}
@@ -484,14 +485,14 @@ Semilla interrumpida & Lea el primer error de la salida. Una carga parcial puede
 
 \clearpage
 \subsection{Preguntas frecuentes}
-\textbf{¿Por qué el reporte está vacío?} Requiere al menos un pedido con traza de preparación y entrega para ese restaurante. Los pendientes y cancelados quedan fuera del cálculo.
+\textbf{¿Por qué el reporte está vacío?} El reporte requiere al menos un pedido con traza de preparación y entrega para ese restaurante. Los pendientes y cancelados quedan fuera del cálculo.
 
 \textbf{¿Por qué no llegó el SMS?} En \code{local} se simula el envío. Con un proveedor externo, confirme el teléfono con prefijo, la configuración del proveedor y el estado real del pedido. Si Plazoleta respondió con error de integración, consulte los registros y la cola luego de restablecer el servicio.
 
 \textbf{¿Cómo vuelvo a empezar?} Detenga el entorno y use otro nombre de proyecto para obtener un volumen nuevo, como se explica en la sección \ref{sec:instalacion}. Cada comando posterior de Compose debe usar el mismo nombre de proyecto.
 
 \subsection{Reportar un incidente}
-Envíe el reporte a Ronald Martinez y Elias Fuentes por el canal acordado. Incluya la hora, el rol, el puerto, la ruta y el identificador del pedido. Anote los pasos para reproducirlo, el resultado esperado, el código HTTP y el campo \code{detail} de la respuesta. Adjunte únicamente los mensajes del registro que describen el fallo, sin credenciales, teléfonos ni PIN.
+Envíe el reporte a Ronald Martinez y Elias Fuentes por el canal acordado. Incluya la hora, el rol, el puerto, la ruta y el identificador del pedido. Anote los pasos para reproducirlo, el resultado esperado, el código de estado HTTP y el campo \code{detail} de la respuesta. Adjunte únicamente los mensajes del registro que describen el fallo, sin credenciales, teléfonos ni PIN.
 
 \textbf{Ejemplo de reporte.} Como empleado, abrí el pedido 1 en la cola \code{READY} y ejecuté \code{POST /orders/1/delivery} en el puerto 8082. Esperaba \code{200} y \code{DELIVERED}. Recibí \code{409} con \code{The security PIN does not match}. Volví a consultar la cola y el pedido seguía en \code{READY}.
 
@@ -502,7 +503,7 @@ Envíe el reporte a Ronald Martinez y Elias Fuentes por el canal acordado. Inclu
 Término & Significado en Food Court \\
 \midrule
 API REST & Interfaz que recibe solicitudes HTTP. Una operación se identifica por su método y su ruta. \\
-Bearer / JWT & Credencial temporal obtenida al iniciar sesión. La API la recibe en el encabezado \code{Authorization}. \\
+Bearer / JWT & El JWT es el token temporal de la sesión. Se envía con el esquema Bearer en el encabezado \code{Authorization}. \\
 Docker Compose & Herramienta que arranca PostgreSQL y los microservicios con la configuración del proyecto. \\
 Flyway & Herramienta que instala y registra las versiones del esquema en cada base. \\
 ID & Identificador numérico de una cuenta, restaurante, plato o pedido. Se obtiene de la respuesta correspondiente. \\
@@ -562,14 +563,14 @@ HU & Puerto & Método y ruta & Rol & Éxito \\
 \begin{itemize}
 \item \call{GET}{/users/{id}}{8081} devuelve datos mínimos de la cuenta. Cualquier usuario puede consultar la propia y el administrador puede consultar otras.
 \item \call{GET}{/restaurants/{id}}{8082} devuelve la relación de propiedad. La consulta está disponible para el administrador o el dueño correspondiente.
-\item \call{GET}{/users/{id}/phone}{8081} permite obtener el teléfono de una cuenta cliente para el flujo de aviso. Los roles administrador y empleado o el propio cliente pueden consultarlo según el contrato.
-\item \call{POST}{/order-status-changes}{8083} registra cambios desde Plazoleta, con el token del cliente o del empleado según la transición. La creación devuelve \code{201} y un registro idéntico que ya existía devuelve \code{200}.
-\item \call{POST}{/notifications/order-ready}{8084} recibe \code{orderId}, \code{restaurantName}, \code{phone} y \code{pin} con un token de empleado. Devuelve \code{202} al aceptar la solicitud. Para operar pedidos use \code{/orders/{orderId}/ready} desde Plazoleta.
+\item \call{GET}{/users/{id}/phone}{8081} permite obtener el teléfono de una cuenta cliente para el flujo de aviso. Puede consultarlo un administrador, un empleado o el titular de la cuenta.
+\item \call{POST}{/order-status-changes}{8083} registra cambios desde Plazoleta, con el token del cliente o del empleado según la transición. Si crea un registro, devuelve \code{201}. Si ya existe un registro idéntico, devuelve \code{200}.
+\item \call{POST}{/notifications/order-ready}{8084} recibe \code{orderId}, \code{restaurantName}, \code{phone} y \code{pin} con un token de empleado. Devuelve \code{202} al aceptar la solicitud. Para operar pedidos, use \code{/orders/{orderId}/ready} desde Plazoleta.
 \end{itemize}
 
 \clearpage
 \section{Recorrido desde la terminal}\label{sec:terminal}
-Use Bash, \code{curl} y \code{jq}. Ejecute estos bloques en la misma terminal sobre un entorno con la semilla recién cargada. El ejemplo supone el pedido 1, el restaurante 1 y las contraseñas de la configuración de demostración. En la lectura dla prueba del PIN incorrecto, \code{-i} muestra el código HTTP.
+Use Bash, \code{curl} y \code{jq}. Ejecute el bloque en una sola terminal tras cargar la semilla. El ejemplo usa el pedido 1, el restaurante 1 y las contraseñas de demostración. En la prueba del PIN incorrecto, la opción \code{-i} de \code{curl} muestra el código de estado HTTP.
 
 \begin{lstlisting}
 set -eo pipefail
