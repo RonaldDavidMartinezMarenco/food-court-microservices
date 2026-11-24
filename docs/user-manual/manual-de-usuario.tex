@@ -115,12 +115,16 @@ Si el entorno ya está en marcha, abra Swagger en el navegador e inicie sesión 
 \begin{lstlisting}
 test -f .env || cp .env.example .env
 \end{lstlisting}
-\item Edite estos valores en \code{.env} antes de arrancar. El proveedor local simula el aviso de que el pedido está listo. \code{SEED_PIN} fija el código que usará el evaluador para entregar el pedido.
+\item Revise estos valores en \code{.env} antes de arrancar. \code{POSTGRES_USER} y \code{POSTGRES_PASSWORD} son las credenciales de PostgreSQL. \code{POSTGRES_DB} indica la base que Docker crea al inicializar el volumen. El proveedor local simula el aviso de pedido listo y \code{SEED_PIN} fija el PIN de la demostración.
 \begin{lstlisting}
+POSTGRES_USER=foodcourt
+POSTGRES_PASSWORD=foodcourt
+POSTGRES_DB=user_db
+
 MESSAGING_PROVIDER=local
 SEED_PIN=482913
 \end{lstlisting}
-\item Inicie el entorno. PostgreSQL usa \code{postgres/init-databases.sql} al inicializar un volumen vacío. Flyway aplica las migraciones al arrancar los tres servicios con base de datos.
+\item Inicie el entorno. Docker ejecuta el SQL inicial al crear el volumen de PostgreSQL y cada servicio con base aplica sus migraciones con Flyway. Las rutas de los scripts están en la sección \ref{sec:postgres}.
 \begin{lstlisting}
 docker compose up -d --build
 docker compose ps
@@ -139,6 +143,49 @@ bash scripts/seed.sh
 \end{enumerate}
 
 \clearpage
+\subsection{Configurar PostgreSQL y ubicar los scripts}\label{sec:postgres}
+Con Docker Compose, conéctese a PostgreSQL desde su equipo en \code{127.0.0.1:5433}. Los contenedores usan \code{postgres:5432}. Los servicios reciben las credenciales de \code{.env} y las URL de sus bases desde \code{compose.yml}.
+
+\begin{minipage}{\linewidth}
+\captionof{table}{Archivos de inicialización y datos de prueba}
+\begin{tabularx}{\linewidth}{@{}P{74mm}Y@{}}
+\toprule
+Ruta desde la raíz del proyecto & Qué hace y cuándo se ejecuta \\
+\midrule
+\code{postgres/init-databases.sql} &
+Crea \code{user_db}, \code{plaza_db} y \code{traceability_db} si faltan. Docker lo ejecuta al inicializar un volumen vacío. \\
+\code{src/main/resources/db/migration/} en \code{user-service}, \code{plaza-service} y \code{traceability-service} &
+Contiene los SQL que Flyway ejecuta cuando arranca el servicio correspondiente. Crean y actualizan las tablas, los índices y las restricciones de cada base. \\
+\code{scripts/seed.sh} &
+Carga los datos de demostración mediante la API. Ejecútelo una vez, desde la raíz, después de comprobar que los servicios respondan. \\
+\bottomrule
+\end{tabularx}
+\end{minipage}
+
+\textbf{Con PostgreSQL instalado en su equipo.} Use PostgreSQL 16 con soporte para ICU, \code{psql} y JDK 21. Desde la raíz del proyecto, ejecute el SQL como el usuario que será dueño de las bases. El ejemplo usa el rol \code{foodcourt} con permiso \code{CREATEDB} y el puerto habitual de una instalación nativa.
+\begin{lstlisting}
+psql -X -h 127.0.0.1 -p 5432 -U foodcourt -d postgres \
+  -f postgres/init-databases.sql
+\end{lstlisting}
+
+En una terminal por servicio con base, cargue los valores de \code{.env} y exporte la conexión. El ejemplo muestra Usuarios. Para Plazoleta, use \code{plaza_db}. Para Trazabilidad, use \code{traceability_db}.
+\begin{lstlisting}
+set -a
+source ./.env
+set +a
+export SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/user_db
+export SPRING_DATASOURCE_USERNAME="$POSTGRES_USER"
+export SPRING_DATASOURCE_PASSWORD="$POSTGRES_PASSWORD"
+\end{lstlisting}
+
+En la terminal de Mensajería basta con cargar \code{.env}. Desde la carpeta de cada servicio, ejecute este comando.
+\begin{lstlisting}
+./mvnw spring-boot:run
+\end{lstlisting}
+
+Cuando los cuatro servicios respondan, ejecute \code{bash scripts/seed.sh} desde la raíz. La guía independiente \code{IMPORTAR_BASE_DE_DATOS.md} detalla el arranque nativo.
+
+\clearpage
 \subsection{Servicios, acceso y cierre de la prueba}
 \begin{minipage}{\linewidth}
 \captionof{table}{Servicios y enlaces del entorno local}
@@ -154,11 +201,9 @@ Mensajería & \swagger{8084} & Sin base & Aviso de pedido listo. \\
 \end{tabularx}
 \end{minipage}
 
-Cada servicio publica su contrato en \code{/v3/api-docs}. Consulte \code{info.version} para conocer la versión del contrato. La plantilla del proyecto indica la revisión del código de cada servicio. La dirección de PostgreSQL desde el anfitrión es \code{127.0.0.1:5433}. Dentro de Compose los servicios conectan por \code{postgres:5432}.
+Cada servicio publica su contrato en \code{/v3/api-docs}. Consulte \code{info.version} para conocer la versión del contrato. La plantilla del proyecto indica la revisión del código de cada servicio.
 
 Para detener el entorno, ejecute \code{docker compose down} desde la raíz. Compose conserva el volumen. Si requiere una demostración nueva, detenga la instancia anterior y arranque con otro nombre de proyecto, por ejemplo \code{docker compose -p foodcourt-prueba up -d --build}. Use un nombre que todavía no tenga un volumen asociado y vuelva a ejecutar la semilla.
-
-La instalación nativa exige PostgreSQL 16, \code{psql} y JDK 21. Ejecute el mismo SQL conectado a la base de mantenimiento \code{postgres} con el rol que será dueño de las bases y arranque los cuatro servicios con Maven Wrapper. La guía independiente \code{IMPORTAR_BASE_DE_DATOS.md} de la entrega explica los comandos, la propiedad de las bases y las URL JDBC.
 
 \section{Funciones y permisos}\label{sec:roles}
 \begin{minipage}{\linewidth}
