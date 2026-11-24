@@ -106,28 +106,20 @@ El manual toma como referencia el resumen público de ISO/IEC/IEEE 26514:2022 pa
 
 \clearpage
 \section{Requisitos previos e instalación}\label{sec:instalacion}
-Si el entorno ya está en marcha, abra Swagger en el navegador e inicie sesión con una cuenta del rol correspondiente. Para ejecutar el proyecto en su equipo, use Docker Compose. El glosario de la sección \ref{sec:glosario} reúne las herramientas y siglas del manual.
+Si el entorno ya está en marcha, abra Swagger en el navegador e inicie sesión con una cuenta del rol correspondiente. Para iniciar el proyecto en su equipo, use Docker Compose. Si ya tiene PostgreSQL instalado, puede seguir los pasos de la sección \ref{sec:postgres}.
 
-\subsection{Preparar una demostración con Docker}
+\subsection{Preparar una demostración con Docker}\label{sec:docker}
 \begin{enumerate}
-\item Extraiga el ZIP y abra Bash en la carpeta que contiene \code{compose.yml}. Necesita Docker en ejecución, Compose 2.20.0 o posterior y conexión para descargar las imágenes y dependencias de la primera compilación. Use Bash, \code{curl} y \code{jq} para la semilla y el recorrido por terminal. En Windows puede usar Docker Desktop con una terminal Bash que tenga esas herramientas.
-\item Compruebe que estén libres el puerto 5433 y los puertos del 8081 al 8084. Si todavía no existe \code{.env}, cópielo de la configuración de ejemplo.
+\item Abra Bash en la carpeta que contiene \code{compose.yml}. Si descargó el repositorio principal desde GitHub, ejecute \code{bash scripts/clone-services.sh} para descargar los cuatro servicios. El paquete de entrega ya los incluye. Necesita Docker en ejecución, Compose 2.20.0 o posterior, \code{curl}, \code{jq} y conexión a Internet para la primera compilación.
+\item Compruebe que estén libres el puerto 5433 y los puertos del 8081 al 8084. El archivo \code{.env.example} contiene la configuración de demostración. \code{POSTGRES_USER} y \code{POSTGRES_PASSWORD} son las credenciales de PostgreSQL. \code{POSTGRES_DB} identifica la base que Docker crea al iniciar el volumen.
+\item Active el modo local y fije el PIN para completar la entrega sin enviar un SMS. Ejecute también los comandos de arranque en esta terminal.
 \begin{lstlisting}
-test -f .env || cp .env.example .env
+export MESSAGING_PROVIDER=local SEED_PIN=482913
 \end{lstlisting}
-\item Revise estos valores en \code{.env} antes de arrancar. \code{POSTGRES_USER} y \code{POSTGRES_PASSWORD} son las credenciales de PostgreSQL. \code{POSTGRES_DB} indica la base que Docker crea al inicializar el volumen. El proveedor local simula el aviso de pedido listo y \code{SEED_PIN} fija el PIN de la demostración.
+\item Inicie el entorno con \code{.env.example}. Docker ejecuta el SQL inicial al crear el volumen de PostgreSQL y los servicios aplican sus migraciones con Flyway. Consulte las rutas en la sección \ref{sec:postgres}.
 \begin{lstlisting}
-POSTGRES_USER=foodcourt
-POSTGRES_PASSWORD=foodcourt
-POSTGRES_DB=user_db
-
-MESSAGING_PROVIDER=local
-SEED_PIN=482913
-\end{lstlisting}
-\item Inicie el entorno. Docker ejecuta el SQL inicial al crear el volumen de PostgreSQL y cada servicio con base aplica sus migraciones con Flyway. Las rutas de los scripts están en la sección \ref{sec:postgres}.
-\begin{lstlisting}
-docker compose up -d --build
-docker compose ps
+docker compose --env-file .env.example up -d --build
+docker compose --env-file .env.example ps
 \end{lstlisting}
 \item Compruebe que los cuatro servicios publiquen OpenAPI. Si un servicio aún no responde, espere a que termine de arrancar y repita la consulta. Si el fallo persiste, revise la sección \ref{sec:soporte}.
 \begin{lstlisting}
@@ -136,15 +128,16 @@ for port in 8081 8082 8083 8084; do
   printf 'API disponible en %s\n' "$port"
 done
 \end{lstlisting}
-\item En una instalación nueva, cargue la semilla una sola vez. Busque \code{Seed loaded.} al final y guarde los identificadores que muestra el script. En el primer arranque, Usuarios crea la cuenta de administrador con los datos de \code{.env}.
+\item En una instalación nueva, cargue la semilla una sola vez. El comando usa la cuenta de administrador de \code{.env.example}. Si configuró otra cuenta al iniciar Usuarios, indique sus credenciales. Busque \code{Seed loaded.} en la salida.
 \begin{lstlisting}
-bash scripts/seed.sh
+ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=secret12 \
+  bash scripts/seed.sh
 \end{lstlisting}
 \end{enumerate}
 
 \clearpage
 \subsection{Configurar PostgreSQL y ubicar los scripts}\label{sec:postgres}
-Con Docker Compose, conéctese a PostgreSQL desde su equipo en \code{127.0.0.1:5433}. Los contenedores usan \code{postgres:5432}. Los servicios reciben las credenciales de \code{.env} y las URL de sus bases desde \code{compose.yml}.
+Con Docker Compose, PostgreSQL queda disponible en \code{127.0.0.1:5433} desde su equipo. Los contenedores se conectan a \code{postgres:5432}. La configuración de ejemplo usa el rol \code{foodcourt}, la contraseña \code{foodcourt} y la base inicial \code{user_db}.
 
 \begin{minipage}{\linewidth}
 \captionof{table}{Archivos de inicialización y datos de prueba}
@@ -162,28 +155,40 @@ Carga los datos de demostración mediante la API. Ejecútelo una vez, desde la r
 \end{tabularx}
 \end{minipage}
 
-\textbf{Con PostgreSQL instalado en su equipo.} Use PostgreSQL 16 con soporte para ICU, \code{psql} y JDK 21. Desde la raíz del proyecto, ejecute el SQL como el usuario que será dueño de las bases. El ejemplo usa el rol \code{foodcourt} con permiso \code{CREATEDB} y el puerto habitual de una instalación nativa.
+\textbf{Instalación sin Docker.} Use PostgreSQL 16 con soporte para ICU, \code{psql}, JDK 21, \code{curl} y \code{jq}. Reúna el código de los servicios como se indica en la sección \ref{sec:docker}. Si falta el rol \code{foodcourt}, ejecute estos comandos desde \code{psql} como administrador. El segundo le pedirá una contraseña.
+\begin{lstlisting}
+CREATE ROLE foodcourt LOGIN CREATEDB;
+\password foodcourt
+\q
+\end{lstlisting}
+
+Desde la raíz del proyecto, ejecute el SQL con el rol que será dueño de las bases. El ejemplo usa el puerto 5432.
 \begin{lstlisting}
 psql -X -h 127.0.0.1 -p 5432 -U foodcourt -d postgres \
   -f postgres/init-databases.sql
 \end{lstlisting}
 
-En una terminal por servicio con base, cargue los valores de \code{.env} y exporte la conexión. El ejemplo muestra Usuarios. Para Plazoleta, use \code{plaza_db}. Para Trazabilidad, use \code{traceability_db}.
+Abra una terminal por servicio en la raíz del proyecto. En las cuatro terminales, cargue la configuración de ejemplo.
 \begin{lstlisting}
 set -a
-source ./.env
+source ./.env.example
 set +a
+export MESSAGING_PROVIDER=local SEED_PIN=482913
+\end{lstlisting}
+
+Si eligió otra contraseña para el rol, exporte su valor en \code{POSTGRES_PASSWORD}. Para Usuarios, configure la conexión como se muestra abajo. Para Plazoleta y Trazabilidad, cambie \code{user_db} por \code{plaza_db} y \code{traceability_db}, respectivamente.
+\begin{lstlisting}
 export SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/user_db
 export SPRING_DATASOURCE_USERNAME="$POSTGRES_USER"
 export SPRING_DATASOURCE_PASSWORD="$POSTGRES_PASSWORD"
 \end{lstlisting}
 
-En la terminal de Mensajería basta con cargar \code{.env}. Desde la carpeta de cada servicio, ejecute este comando.
+Mensajería funciona sin conexión a PostgreSQL. Inicie cada servicio con este comando desde su carpeta.
 \begin{lstlisting}
 ./mvnw spring-boot:run
 \end{lstlisting}
 
-Cuando los cuatro servicios respondan, ejecute \code{bash scripts/seed.sh} desde la raíz. La guía independiente \code{IMPORTAR_BASE_DE_DATOS.md} detalla el arranque nativo.
+Cuando los cuatro servicios respondan, ejecute la semilla desde la raíz con el comando de la sección \ref{sec:docker}.
 
 \clearpage
 \subsection{Servicios, acceso y cierre de la prueba}
@@ -203,7 +208,7 @@ Mensajería & \swagger{8084} & Sin base & Aviso de pedido listo. \\
 
 Cada servicio publica su contrato en \code{/v3/api-docs}. Consulte \code{info.version} para conocer la versión del contrato. La plantilla del proyecto indica la revisión del código de cada servicio.
 
-Para detener el entorno, ejecute \code{docker compose down} desde la raíz. Compose conserva el volumen. Si requiere una demostración nueva, detenga la instancia anterior y arranque con otro nombre de proyecto, por ejemplo \code{docker compose -p foodcourt-prueba up -d --build}. Use un nombre que todavía no tenga un volumen asociado y vuelva a ejecutar la semilla.
+Para detener el entorno de Docker, ejecute \code{docker compose --env-file .env.example down} desde la raíz. Compose conserva el volumen. Para una prueba nueva, detenga la instancia anterior y añada \code{-p foodcourt-prueba} a los comandos de Compose. Use un nombre sin volumen asociado y vuelva a ejecutar la semilla. Si inició los servicios con Maven, pulse \code{Ctrl+C} en cada terminal.
 
 \section{Funciones y permisos}\label{sec:roles}
 \begin{minipage}{\linewidth}
@@ -474,7 +479,13 @@ Proveedor & Configuración y resultado \\
 
 \code{scripts/seed.sh} funciona con \code{SEED_PIN} configurado o vacío. Deja el pedido de Ronald en \code{IN_PREPARATION}. Para completar la entrega con el proveedor local, inicie Plazoleta con un PIN fijo conocido. Una configuración de PIN fijo inválida impide que Plazoleta arranque. Si ejecuta Plazoleta directamente con Java, exporte \code{SEED_PIN}. Si también define \code{APP_PIN_FIXED}, este último tiene prioridad.
 
-Para probar un SMS real, seleccione \code{textbee} y configure sus credenciales en \code{.env}. Use \code{TEXTBEE_BASE_URL} para cambiar la URL predeterminada si corresponde. Para generar PIN aleatorios, deje \code{SEED_PIN} vacío. Si cambia el valor con el entorno en marcha, aplique el cambio con \code{docker compose up -d plaza-service}. Los pedidos que ya están listos conservan su PIN. Cree un cliente con un número propio autorizado, haga un pedido y siga el recorrido de empleado. Confirme que el mensaje llegó y use el PIN recibido.
+Para probar un SMS real, exporte \code{MESSAGING_PROVIDER=textbee} y \code{TEXTBEE_API_KEY} en su terminal. Use \code{TEXTBEE_BASE_URL} si necesita cambiar la URL de textbee. Para generar PIN aleatorios, ejecute \code{export SEED_PIN=}. En Docker, aplique los cambios con el siguiente comando. Los pedidos ya listos conservan su PIN.
+\begin{lstlisting}
+docker compose --env-file .env.example up -d \
+  messaging-service plaza-service
+\end{lstlisting}
+
+Cree un cliente con un número propio autorizado, haga un pedido y siga el recorrido de empleado. Confirme que el mensaje llegó y use el PIN recibido para entregar.
 
 \clearpage
 \subsection{Del aviso a la entrega}
@@ -493,9 +504,11 @@ Las rutas de integración se incluyen para identificar dónde ocurrió un error.
 \section{Solución de problemas y soporte}\label{sec:soporte}
 En Swagger, lea primero el código de la respuesta y su \code{detail}. Si hay errores de campos, compare el cuerpo enviado con el JSON del procedimiento. Para fallos entre servicios, lea el registro de los contenedores correspondientes.
 \begin{lstlisting}
-docker compose ps
-docker compose logs --tail=80 user-service plaza-service
-docker compose logs --tail=80 traceability-service messaging-service
+docker compose --env-file .env.example ps
+docker compose --env-file .env.example logs --tail=80 \
+  user-service plaza-service
+docker compose --env-file .env.example logs --tail=80 \
+  traceability-service messaging-service
 \end{lstlisting}
 
 \subsection{Diagnóstico por síntoma}
